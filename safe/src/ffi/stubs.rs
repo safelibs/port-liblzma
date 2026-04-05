@@ -5,6 +5,7 @@ use core::ffi::{c_char, c_int};
 use core::ptr;
 
 use super::types::*;
+use crate::internal::{check, hardware, preset, stream_state, vli};
 
 #[no_mangle]
 #[allow(unused_variables)]
@@ -133,36 +134,43 @@ pub unsafe extern "C" fn lzma_block_unpadded_size(arg0: *const lzma_block) -> lz
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_check_is_supported(arg0: lzma_check) -> lzma_bool {
-    0
+    check::check_is_supported(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_check_size(arg0: lzma_check) -> u32 {
-    match arg0 {
-        1 => 4,
-        4 => 8,
-        10 => 32,
-        _ => 0,
-    }
+    check::check_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_code(arg0: *mut lzma_stream, arg1: lzma_action) -> lzma_ret {
-    LZMA_PROG_ERROR
+    stream_state::lzma_code_impl(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_crc32(arg0: *const u8, arg1: usize, arg2: u32) -> u32 {
-    arg2
+    if arg1 == 0 {
+        return check::crc32::crc32(&[], arg2);
+    }
+    if arg0.is_null() {
+        return arg2;
+    }
+    check::crc32::crc32(core::slice::from_raw_parts(arg0, arg1), arg2)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_crc64(arg0: *const u8, arg1: usize, arg2: u64) -> u64 {
-    arg2
+    if arg1 == 0 {
+        return check::crc64::crc64(&[], arg2);
+    }
+    if arg0.is_null() {
+        return arg2;
+    }
+    check::crc64::crc64(core::slice::from_raw_parts(arg0, arg1), arg2)
 }
 
 #[no_mangle]
@@ -205,14 +213,7 @@ pub unsafe extern "C" fn lzma_easy_encoder_memusage(arg0: u32) -> u64 {
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_end(arg0: *mut lzma_stream) {
-    if !arg0.is_null() {
-        (*arg0).internal = ptr::null_mut();
-        (*arg0).allocator = ptr::null();
-        (*arg0).next_in = ptr::null();
-        (*arg0).next_out = ptr::null_mut();
-        (*arg0).avail_in = 0;
-        (*arg0).avail_out = 0;
-    }
+    stream_state::lzma_end_impl(arg0)
 }
 
 #[no_mangle]
@@ -281,7 +282,7 @@ pub unsafe extern "C" fn lzma_filters_update(
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_get_check(arg0: *const lzma_stream) -> lzma_check {
-    LZMA_CHECK_NONE
+    stream_state::lzma_get_check_impl(arg0)
 }
 
 #[no_mangle]
@@ -526,46 +527,43 @@ pub unsafe extern "C" fn lzma_index_uncompressed_size(arg0: *const lzma_index) -
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_lzma_preset(arg0: *mut lzma_options_lzma, arg1: u32) -> lzma_bool {
-    if !arg0.is_null() {
-        ptr::write_bytes(arg0, 0, 1);
-    }
-    0
+    preset::lzma_lzma_preset_impl(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_memlimit_get(arg0: *const lzma_stream) -> u64 {
-    0
+    stream_state::lzma_memlimit_get_impl(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_memlimit_set(arg0: *mut lzma_stream, arg1: u64) -> lzma_ret {
-    LZMA_PROG_ERROR
+    stream_state::lzma_memlimit_set_impl(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_memusage(arg0: *const lzma_stream) -> u64 {
-    u64::MAX
+    stream_state::lzma_memusage_impl(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_mf_is_supported(arg0: lzma_match_finder) -> lzma_bool {
-    0
+    preset::mf_is_supported(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_mode_is_supported(arg0: lzma_mode) -> lzma_bool {
-    0
+    preset::mode_is_supported(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_physmem() -> u64 {
-    0
+    hardware::physmem()
 }
 
 #[no_mangle]
@@ -779,7 +777,7 @@ pub unsafe extern "C" fn lzma_vli_decode(
     arg3: *mut usize,
     arg4: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    vli::lzma_vli_decode_impl(arg0, arg1, arg2, arg3, arg4)
 }
 
 #[no_mangle]
@@ -791,13 +789,13 @@ pub unsafe extern "C" fn lzma_vli_encode(
     arg3: *mut usize,
     arg4: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    vli::lzma_vli_encode_impl(arg0, arg1, arg2, arg3, arg4)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_vli_size(arg0: lzma_vli) -> u32 {
-    0
+    vli::lzma_vli_size_impl(arg0)
 }
 
 #[no_mangle]
@@ -816,18 +814,13 @@ pub unsafe extern "C" fn lzma_block_uncomp_encode(
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_cputhreads() -> u32 {
-    0
+    hardware::cputhreads()
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_get_progress(arg0: *mut lzma_stream, arg1: *mut u64, arg2: *mut u64) {
-    if !arg1.is_null() {
-        *arg1 = 0;
-    }
-    if !arg2.is_null() {
-        *arg2 = 0;
-    }
+    stream_state::lzma_get_progress_impl(arg0, arg1, arg2)
 }
 
 #[no_mangle]

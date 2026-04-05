@@ -41,13 +41,13 @@
 /* #undef HAVE_CFPREFERENCESCOPYAPPVALUE */
 
 /* Define to 1 if crc32 integrity check is enabled. */
-/* #undef HAVE_CHECK_CRC32 */
+#define HAVE_CHECK_CRC32 1
 
 /* Define to 1 if crc64 integrity check is enabled. */
-/* #undef HAVE_CHECK_CRC64 */
+#define HAVE_CHECK_CRC64 1
 
 /* Define to 1 if sha256 integrity check is enabled. */
-/* #undef HAVE_CHECK_SHA256 */
+#define HAVE_CHECK_SHA256 1
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #define HAVE_CLOCK_GETTIME 1
@@ -342,7 +342,7 @@
 #define LT_OBJDIR ".libs/"
 
 /* Define to 1 when using POSIX threads (pthreads). */
-/* #undef MYTHREAD_POSIX */
+#define MYTHREAD_POSIX 1
 
 /* Define to 1 when using Windows Vista compatible threads. This uses features
    that are not available on Windows XP. */
@@ -601,5 +601,5 @@
    pointer, if such a type exists, and if the system does not define it. */
 /* #undef uintptr_t */
 
-/* Phase 01 scaffold ABI shell: advertise only verified functionality. */
-/* Feature macros are intentionally left undefined in this phase. */
+/* Phase 02 foundation: keep checksum and threading probes enabled. */
+/* Encoder/decoder feature macros stay undefined until those paths are implemented. */

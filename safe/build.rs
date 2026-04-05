@@ -16,6 +16,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/ffi/mod.rs");
     println!("cargo:rerun-if-changed=src/ffi/types.rs");
     println!("cargo:rerun-if-changed=src/ffi/stubs.rs");
+    println!("cargo:rerun-if-changed=src/internal");
 
     match env::var("CARGO_CFG_TARGET_OS").as_deref() {
         Ok("linux") => {

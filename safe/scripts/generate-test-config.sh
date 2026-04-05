@@ -10,9 +10,6 @@ mkdir -p "$(dirname "$dest")"
 
 awk '
 BEGIN {
-  phase01["HAVE_CHECK_CRC32"] = 1
-  phase01["HAVE_CHECK_CRC64"] = 1
-  phase01["HAVE_CHECK_SHA256"] = 1
   phase01["HAVE_DECODERS"] = 1
   phase01["HAVE_ENCODERS"] = 1
   phase01["HAVE_DECODER_ARM"] = 1
@@ -41,7 +38,6 @@ BEGIN {
   phase01["HAVE_MF_BT4"] = 1
   phase01["HAVE_MF_HC3"] = 1
   phase01["HAVE_MF_HC4"] = 1
-  phase01["MYTHREAD_POSIX"] = 1
 }
 /^#define / {
   macro = $2
@@ -53,7 +49,7 @@ BEGIN {
 { print }
 END {
   print ""
-  print "/* Phase 01 scaffold ABI shell: advertise only verified functionality. */"
-  print "/* Feature macros are intentionally left undefined in this phase. */"
+  print "/* Phase 02 foundation: keep checksum and threading probes enabled. */"
+  print "/* Encoder/decoder feature macros stay undefined until those paths are implemented. */"
 }
 ' "$src" > "$dest"
