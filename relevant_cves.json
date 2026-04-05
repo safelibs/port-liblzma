@@ -1,0 +1,61 @@
+{
+  "library": "liblzma",
+  "project": "XZ Utils",
+  "source_dataset": "all_cves.json",
+  "snapshot_date": "2026-04-05",
+  "analyzed_at_utc": "2026-04-05T17:25:49Z",
+  "selection_criteria": "Retain CVEs from all_cves.json only when they are not fundamentally memory-corruption issues and could still affect a Rust reimplementation of liblzma. Exclude C-specific memory-safety bugs, command-line or script-only issues outside liblzma, and disputed or bogus reports.",
+  "analysis_summary": {
+    "total_cves_reviewed": 7,
+    "relevant_non_memory_corruption_cves": 1
+  },
+  "relevant_cves": [
+    {
+      "cve_id": "CVE-2024-3094",
+      "affects_liblzma": true,
+      "status_at_snapshot": "historical",
+      "bug_class": "Embedded malicious code / supply-chain compromise",
+      "summary": "XZ Utils 5.6.0 and 5.6.1 release tarballs contained malicious code that altered liblzma during the build.",
+      "why_relevant_to_rust_reimplementation": "This issue came from the release and build pipeline, not from C memory unsafety. A Rust port would still be vulnerable if its crate releases, source tarballs, build scripts, CI artifacts, or signing workflow were compromised.",
+      "rust_reimplementation_considerations": [
+        "Publish from auditable version-controlled source and verify that release artifacts match the tagged source.",
+        "Keep release builds free of opaque prebuilt objects, disguised test assets, or other inputs that can silently alter the shipped library.",
+        "Minimize build-time code execution and treat build scripts, code generators, and packaging steps as part of the security boundary.",
+        "Use reproducible builds and strict maintainer controls for release signing and publishing."
+      ],
+      "upstream_advisory_url": "https://tukaani.org/xz-backdoor/",
+      "reference_urls": [
+        "https://access.redhat.com/security/cve/CVE-2024-3094",
+        "https://www.openwall.com/lists/oss-security/2024/03/29/4",
+        "https://www.redhat.com/en/blog/urgent-security-alert-fedora-41-and-rawhide-users",
+        "https://tukaani.org/xz-backdoor/"
+      ]
+    }
+  ],
+  "excluded_after_analysis": [
+    {
+      "cve_id": "CVE-2025-31115",
+      "reason": "Excluded because the reported impact is a threaded-decoder race that manifests as use-after-free and null-based invalid writes. That is primarily a memory-safety bug class that a safe Rust ownership model should eliminate, even though equivalent decoder-state tests are still worth keeping."
+    },
+    {
+      "cve_id": "CVE-2026-34743",
+      "reason": "Excluded because it is a heap buffer overflow caused by an undersized allocation after empty-Index decoding. This is a memory-corruption issue that a safe Rust port should not reproduce directly."
+    },
+    {
+      "cve_id": "CVE-2024-47611",
+      "reason": "Excluded because it is a non-memory-corruption issue in native Windows command-line tools; the official advisory states that liblzma is unaffected."
+    },
+    {
+      "cve_id": "CVE-2022-1271",
+      "reason": "Excluded because it affects xzgrep filename handling rather than the liblzma library."
+    },
+    {
+      "cve_id": "CVE-2015-4035",
+      "reason": "Excluded because it affects the xzgrep script rather than the liblzma library."
+    },
+    {
+      "cve_id": "CVE-2020-22916",
+      "reason": "Excluded because the upstream project documents it as a bogus CVE and not a real liblzma security issue."
+    }
+  ]
+}
