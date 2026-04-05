@@ -2,10 +2,9 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int};
-use core::ptr;
 
 use super::types::*;
-use crate::internal::{check, filter, hardware, preset, stream_flags, stream_state, vli};
+use crate::internal::{check, filter, hardware, index, preset, stream_flags, stream_state, vli};
 
 #[no_mangle]
 #[allow(unused_variables)]
@@ -293,13 +292,13 @@ pub unsafe extern "C" fn lzma_index_append(
     arg2: lzma_vli,
     arg3: lzma_vli,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_append(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_block_count(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_block_count(arg0)
 }
 
 #[no_mangle]
@@ -312,7 +311,7 @@ pub unsafe extern "C" fn lzma_index_buffer_decode(
     arg4: *mut usize,
     arg5: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_buffer_decode(arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 #[no_mangle]
@@ -323,7 +322,7 @@ pub unsafe extern "C" fn lzma_index_buffer_encode(
     arg2: *mut usize,
     arg3: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_buffer_encode(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -333,13 +332,13 @@ pub unsafe extern "C" fn lzma_index_cat(
     arg1: *mut lzma_index,
     arg2: *const lzma_allocator,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_cat(arg0, arg1, arg2)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_checks(arg0: *const lzma_index) -> u32 {
-    0
+    index::index_checks(arg0)
 }
 
 #[no_mangle]
@@ -349,7 +348,7 @@ pub unsafe extern "C" fn lzma_index_decoder(
     arg1: *mut *mut lzma_index,
     arg2: u64,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -358,7 +357,7 @@ pub unsafe extern "C" fn lzma_index_dup(
     arg0: *const lzma_index,
     arg1: *const lzma_allocator,
 ) -> *mut lzma_index {
-    ptr::null_mut()
+    index::index_dup(arg0, arg1)
 }
 
 #[no_mangle]
@@ -367,17 +366,19 @@ pub unsafe extern "C" fn lzma_index_encoder(
     arg0: *mut lzma_stream,
     arg1: *const lzma_index,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_encoder(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
-pub unsafe extern "C" fn lzma_index_end(arg0: *mut lzma_index, arg1: *const lzma_allocator) {}
+pub unsafe extern "C" fn lzma_index_end(arg0: *mut lzma_index, arg1: *const lzma_allocator) {
+    index::index_end(arg0, arg1)
+}
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_file_size(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_file_size(arg0)
 }
 
 #[no_mangle]
@@ -387,7 +388,7 @@ pub unsafe extern "C" fn lzma_index_hash_append(
     arg1: lzma_vli,
     arg2: lzma_vli,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_hash_append(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -398,7 +399,7 @@ pub unsafe extern "C" fn lzma_index_hash_decode(
     arg2: *mut usize,
     arg3: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_hash_decode(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -407,6 +408,7 @@ pub unsafe extern "C" fn lzma_index_hash_end(
     arg0: *mut lzma_index_hash,
     arg1: *const lzma_allocator,
 ) {
+    index::index_hash_end(arg0, arg1)
 }
 
 #[no_mangle]
@@ -415,27 +417,25 @@ pub unsafe extern "C" fn lzma_index_hash_init(
     arg0: *mut lzma_index_hash,
     arg1: *const lzma_allocator,
 ) -> *mut lzma_index_hash {
-    ptr::null_mut()
+    index::index_hash_init(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_hash_size(arg0: *const lzma_index_hash) -> lzma_vli {
-    0
+    index::index_hash_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_init(arg0: *const lzma_allocator) -> *mut lzma_index {
-    ptr::null_mut()
+    index::index_init(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_iter_init(arg0: *mut lzma_index_iter, arg1: *const lzma_index) {
-    if !arg0.is_null() {
-        ptr::write_bytes(arg0, 0, 1);
-    }
+    index::index_iter_init(arg0, arg1)
 }
 
 #[no_mangle]
@@ -444,7 +444,7 @@ pub unsafe extern "C" fn lzma_index_iter_locate(
     arg0: *mut lzma_index_iter,
     arg1: lzma_vli,
 ) -> lzma_bool {
-    0
+    index::index_iter_locate(arg0, arg1)
 }
 
 #[no_mangle]
@@ -453,39 +453,37 @@ pub unsafe extern "C" fn lzma_index_iter_next(
     arg0: *mut lzma_index_iter,
     arg1: lzma_index_iter_mode,
 ) -> lzma_bool {
-    0
+    index::index_iter_next(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_iter_rewind(arg0: *mut lzma_index_iter) {
-    if !arg0.is_null() {
-        ptr::write_bytes(arg0, 0, 1);
-    }
+    index::index_iter_rewind(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_memusage(arg0: lzma_vli, arg1: lzma_vli) -> u64 {
-    u64::MAX
+    index::index_memusage(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_memused(arg0: *const lzma_index) -> u64 {
-    0
+    index::index_memused(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_size(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_stream_count(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_stream_count(arg0)
 }
 
 #[no_mangle]
@@ -494,7 +492,7 @@ pub unsafe extern "C" fn lzma_index_stream_flags(
     arg0: *mut lzma_index,
     arg1: *const lzma_stream_flags,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_stream_flags(arg0, arg1)
 }
 
 #[no_mangle]
@@ -503,25 +501,25 @@ pub unsafe extern "C" fn lzma_index_stream_padding(
     arg0: *mut lzma_index,
     arg1: lzma_vli,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::index_stream_padding(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_stream_size(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_stream_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_total_size(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_total_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_index_uncompressed_size(arg0: *const lzma_index) -> lzma_vli {
-    0
+    index::index_uncompressed_size(arg0)
 }
 
 #[no_mangle]
@@ -846,7 +844,7 @@ pub unsafe extern "C" fn lzma_file_info_decoder(
     arg2: u64,
     arg3: u64,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    index::file_info_decoder(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
