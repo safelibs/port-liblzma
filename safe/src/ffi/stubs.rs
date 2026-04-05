@@ -5,7 +5,7 @@ use core::ffi::{c_char, c_int};
 use core::ptr;
 
 use super::types::*;
-use crate::internal::{check, hardware, preset, stream_state, vli};
+use crate::internal::{check, filter, hardware, preset, stream_flags, stream_state, vli};
 
 #[no_mangle]
 #[allow(unused_variables)]
@@ -219,13 +219,13 @@ pub unsafe extern "C" fn lzma_end(arg0: *mut lzma_stream) {
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_filter_decoder_is_supported(arg0: lzma_vli) -> lzma_bool {
-    0
+    filter::decoder_is_supported(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_filter_encoder_is_supported(arg0: lzma_vli) -> lzma_bool {
-    0
+    filter::encoder_is_supported(arg0)
 }
 
 #[no_mangle]
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn lzma_filter_flags_decode(
     arg3: *mut usize,
     arg4: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::filter_flags_decode_impl(arg0, arg1, arg2, arg3, arg4)
 }
 
 #[no_mangle]
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn lzma_filter_flags_encode(
     arg2: *mut usize,
     arg3: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::filter_flags_encode_impl(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -257,7 +257,7 @@ pub unsafe extern "C" fn lzma_filter_flags_size(
     arg0: *mut u32,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::filter_flags_size_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn lzma_filters_copy(
     arg1: *mut lzma_filter,
     arg2: *const lzma_allocator,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::filters_copy_impl(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -574,7 +574,7 @@ pub unsafe extern "C" fn lzma_properties_decode(
     arg2: *const u8,
     arg3: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::properties_decode_impl(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -583,7 +583,7 @@ pub unsafe extern "C" fn lzma_properties_encode(
     arg0: *const lzma_filter,
     arg1: *mut u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::properties_encode_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -592,7 +592,7 @@ pub unsafe extern "C" fn lzma_properties_size(
     arg0: *mut u32,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::properties_size_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -717,7 +717,7 @@ pub unsafe extern "C" fn lzma_stream_flags_compare(
     arg0: *const lzma_stream_flags,
     arg1: *const lzma_stream_flags,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    stream_flags::stream_flags_compare_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -726,7 +726,7 @@ pub unsafe extern "C" fn lzma_stream_footer_decode(
     arg0: *mut lzma_stream_flags,
     arg1: *const u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    stream_flags::stream_footer_decode_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -735,7 +735,7 @@ pub unsafe extern "C" fn lzma_stream_footer_encode(
     arg0: *const lzma_stream_flags,
     arg1: *mut u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    stream_flags::stream_footer_encode_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -744,7 +744,7 @@ pub unsafe extern "C" fn lzma_stream_header_decode(
     arg0: *mut lzma_stream_flags,
     arg1: *const u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    stream_flags::stream_header_decode_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -753,7 +753,7 @@ pub unsafe extern "C" fn lzma_stream_header_encode(
     arg0: *const lzma_stream_flags,
     arg1: *mut u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    stream_flags::stream_header_encode_impl(arg0, arg1)
 }
 
 #[no_mangle]
@@ -851,7 +851,9 @@ pub unsafe extern "C" fn lzma_file_info_decoder(
 
 #[no_mangle]
 #[allow(unused_variables)]
-pub unsafe extern "C" fn lzma_filters_free(arg0: *mut lzma_filter, arg1: *const lzma_allocator) {}
+pub unsafe extern "C" fn lzma_filters_free(arg0: *mut lzma_filter, arg1: *const lzma_allocator) {
+    filter::filters_free_impl(arg0, arg1)
+}
 
 #[no_mangle]
 #[allow(unused_variables)]
@@ -901,7 +903,7 @@ pub unsafe extern "C" fn lzma_str_from_filters(
     arg2: u32,
     arg3: *const lzma_allocator,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::str_from_filters_impl(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -912,7 +914,7 @@ pub unsafe extern "C" fn lzma_str_list_filters(
     arg2: u32,
     arg3: *const lzma_allocator,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    filter::str_list_filters_impl(arg0, arg1, arg2, arg3)
 }
 
 #[no_mangle]
@@ -924,5 +926,5 @@ pub unsafe extern "C" fn lzma_str_to_filters(
     arg3: u32,
     arg4: *const lzma_allocator,
 ) -> *const c_char {
-    ptr::null()
+    filter::str_to_filters_impl(arg0, arg1, arg2, arg3, arg4)
 }

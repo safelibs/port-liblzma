@@ -33,7 +33,15 @@ pub(crate) const LZMA_MODE_NORMAL: lzma_mode = 2;
 
 pub(crate) const LZMA_PRESET_LEVEL_MASK: u32 = 0x1F;
 pub(crate) const LZMA_PRESET_EXTREME: u32 = 1u32 << 31;
+pub(crate) const LZMA_PRESET_DEFAULT: u32 = 6;
 
+pub(crate) const LZMA_LCLP_MIN: u32 = 0;
+pub(crate) const LZMA_LCLP_MAX: u32 = 4;
+pub(crate) const LZMA_PB_MIN: u32 = 0;
+pub(crate) const LZMA_PB_MAX: u32 = 4;
+pub(crate) const LZMA_DICT_SIZE_MIN: u32 = 4096;
+pub(crate) const LZMA_DELTA_DIST_MIN: u32 = 1;
+pub(crate) const LZMA_DELTA_DIST_MAX: u32 = 256;
 pub(crate) const LZMA_LC_DEFAULT: u32 = 3;
 pub(crate) const LZMA_LP_DEFAULT: u32 = 0;
 pub(crate) const LZMA_PB_DEFAULT: u32 = 2;
@@ -80,10 +88,7 @@ pub(crate) unsafe fn lzma_alloc(size: usize, allocator: *const lzma_allocator) -
 }
 
 #[inline]
-pub(crate) unsafe fn lzma_alloc_zero(
-    size: usize,
-    allocator: *const lzma_allocator,
-) -> *mut c_void {
+pub(crate) unsafe fn lzma_alloc_zero(size: usize, allocator: *const lzma_allocator) -> *mut c_void {
     let size = size.max(1);
 
     if !allocator.is_null() {

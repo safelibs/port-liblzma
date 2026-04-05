@@ -6,8 +6,10 @@ mod internal {
 
     pub(crate) mod check;
     pub(crate) mod common;
+    pub(crate) mod filter;
     pub(crate) mod hardware;
     pub(crate) mod preset;
+    pub(crate) mod stream_flags;
     pub(crate) mod stream_state;
     pub(crate) mod vli;
 }

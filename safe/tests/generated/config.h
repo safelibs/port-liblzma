@@ -66,73 +66,73 @@
 #define HAVE_DCGETTEXT 1
 
 /* Define to 1 if any of HAVE_DECODER_foo have been defined. */
-/* #undef HAVE_DECODERS */
+#define HAVE_DECODERS 1
 
 /* Define to 1 if arm decoder is enabled. */
-/* #undef HAVE_DECODER_ARM */
+#define HAVE_DECODER_ARM 1
 
 /* Define to 1 if arm64 decoder is enabled. */
-/* #undef HAVE_DECODER_ARM64 */
+#define HAVE_DECODER_ARM64 1
 
 /* Define to 1 if armthumb decoder is enabled. */
-/* #undef HAVE_DECODER_ARMTHUMB */
+#define HAVE_DECODER_ARMTHUMB 1
 
 /* Define to 1 if delta decoder is enabled. */
-/* #undef HAVE_DECODER_DELTA */
+#define HAVE_DECODER_DELTA 1
 
 /* Define to 1 if ia64 decoder is enabled. */
-/* #undef HAVE_DECODER_IA64 */
+#define HAVE_DECODER_IA64 1
 
 /* Define to 1 if lzma1 decoder is enabled. */
-/* #undef HAVE_DECODER_LZMA1 */
+#define HAVE_DECODER_LZMA1 1
 
 /* Define to 1 if lzma2 decoder is enabled. */
-/* #undef HAVE_DECODER_LZMA2 */
+#define HAVE_DECODER_LZMA2 1
 
 /* Define to 1 if powerpc decoder is enabled. */
-/* #undef HAVE_DECODER_POWERPC */
+#define HAVE_DECODER_POWERPC 1
 
 /* Define to 1 if sparc decoder is enabled. */
-/* #undef HAVE_DECODER_SPARC */
+#define HAVE_DECODER_SPARC 1
 
 /* Define to 1 if x86 decoder is enabled. */
-/* #undef HAVE_DECODER_X86 */
+#define HAVE_DECODER_X86 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
 
 /* Define to 1 if any of HAVE_ENCODER_foo have been defined. */
-/* #undef HAVE_ENCODERS */
+#define HAVE_ENCODERS 1
 
 /* Define to 1 if arm encoder is enabled. */
-/* #undef HAVE_ENCODER_ARM */
+#define HAVE_ENCODER_ARM 1
 
 /* Define to 1 if arm64 encoder is enabled. */
-/* #undef HAVE_ENCODER_ARM64 */
+#define HAVE_ENCODER_ARM64 1
 
 /* Define to 1 if armthumb encoder is enabled. */
-/* #undef HAVE_ENCODER_ARMTHUMB */
+#define HAVE_ENCODER_ARMTHUMB 1
 
 /* Define to 1 if delta encoder is enabled. */
-/* #undef HAVE_ENCODER_DELTA */
+#define HAVE_ENCODER_DELTA 1
 
 /* Define to 1 if ia64 encoder is enabled. */
-/* #undef HAVE_ENCODER_IA64 */
+#define HAVE_ENCODER_IA64 1
 
 /* Define to 1 if lzma1 encoder is enabled. */
-/* #undef HAVE_ENCODER_LZMA1 */
+#define HAVE_ENCODER_LZMA1 1
 
 /* Define to 1 if lzma2 encoder is enabled. */
-/* #undef HAVE_ENCODER_LZMA2 */
+#define HAVE_ENCODER_LZMA2 1
 
 /* Define to 1 if powerpc encoder is enabled. */
-/* #undef HAVE_ENCODER_POWERPC */
+#define HAVE_ENCODER_POWERPC 1
 
 /* Define to 1 if sparc encoder is enabled. */
-/* #undef HAVE_ENCODER_SPARC */
+#define HAVE_ENCODER_SPARC 1
 
 /* Define to 1 if x86 encoder is enabled. */
-/* #undef HAVE_ENCODER_X86 */
+#define HAVE_ENCODER_X86 1
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #define HAVE_FCNTL_H 1
@@ -178,19 +178,19 @@
 #define HAVE_MBRTOWC 1
 
 /* Define to 1 to enable bt2 match finder. */
-/* #undef HAVE_MF_BT2 */
+#define HAVE_MF_BT2 1
 
 /* Define to 1 to enable bt3 match finder. */
-/* #undef HAVE_MF_BT3 */
+#define HAVE_MF_BT3 1
 
 /* Define to 1 to enable bt4 match finder. */
-/* #undef HAVE_MF_BT4 */
+#define HAVE_MF_BT4 1
 
 /* Define to 1 to enable hc3 match finder. */
-/* #undef HAVE_MF_HC3 */
+#define HAVE_MF_HC3 1
 
 /* Define to 1 to enable hc4 match finder. */
-/* #undef HAVE_MF_HC4 */
+#define HAVE_MF_HC4 1
 
 /* Define to 1 if you have the <minix/config.h> header file. */
 /* #undef HAVE_MINIX_CONFIG_H */
@@ -601,5 +601,5 @@
    pointer, if such a type exists, and if the system does not define it. */
 /* #undef uintptr_t */
 
-/* Phase 02 foundation: keep checksum and threading probes enabled. */
-/* Encoder/decoder feature macros stay undefined until those paths are implemented. */
+/* Phase 03: filter metadata, properties, string conversion, and stream flag helpers are implemented. */
+/* Keep lzip disabled until the corresponding decoder surface exists in Rust. */
