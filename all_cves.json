@@ -1,0 +1,1925 @@
+{
+  "included_cves": [
+    {
+      "affects_liblzma": true,
+      "cve_id": "CVE-2024-3094",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "metrics": [
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2024-3094",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "yes"
+                        },
+                        {
+                          "Technical Impact": "total"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2024-04-02T04:00:23.138684Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2024-07-30T15:37:17.662Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            },
+            {
+              "providerMetadata": {
+                "dateUpdated": "2025-08-19T00:24:09.962Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "url": "https://www.binarly.io/blog/persistent-risk-xz-utils-backdoor-still-lurking-in-docker-images"
+                },
+                {
+                  "tags": [
+                    "vdb-entry",
+                    "x_refsource_REDHAT",
+                    "x_transferred"
+                  ],
+                  "url": "https://access.redhat.com/security/cve/CVE-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://ariadne.space/2024/04/02/the-xz-utils-backdoor-is-a-symptom-of-a-larger-problem/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://arstechnica.com/security/2024/03/backdoor-found-in-widely-used-linux-utility-breaks-encrypted-ssh-connections/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://aws.amazon.com/security/security-bulletins/AWS-2024-002/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://blog.netbsd.org/tnf/entry/statement_on_backdoor_in_xz"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://boehs.org/node/everything-i-know-about-the-xz-backdoor"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1068024"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://bugs.gentoo.org/928134"
+                },
+                {
+                  "name": "RHBZ#2272210",
+                  "tags": [
+                    "issue-tracking",
+                    "x_refsource_REDHAT",
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2272210"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.suse.com/show_bug.cgi?id=1222124"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://discourse.nixos.org/t/cve-2024-3094-malicious-code-in-xz-5-6-0-and-5-6-1-tarballs/42405"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://gist.github.com/thesamesam/223949d5a074ebc3dce9ee78baad9e27"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://github.com/advisories/GHSA-rxwq-x6h5-x525"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://github.com/amlweems/xzbot"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://github.com/karcherm/xz-malware"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://gynvael.coldwind.pl/?lang=en&id=782"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://lists.debian.org/debian-security-announce/2024/msg00057.html"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://lists.freebsd.org/archives/freebsd-security/2024-March/000248.html"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://lwn.net/Articles/967180/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://news.ycombinator.com/item?id=39865810"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://news.ycombinator.com/item?id=39877267"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://news.ycombinator.com/item?id=39895344"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://openssf.org/blog/2024/03/30/xz-backdoor-cve-2024-3094/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://research.swtch.com/xz-script"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://research.swtch.com/xz-timeline"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://security-tracker.debian.org/tracker/CVE-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://security.alpinelinux.org/vuln/CVE-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://security.archlinux.org/CVE-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://security.netapp.com/advisory/ntap-20240402-0001/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://tukaani.org/xz-backdoor/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://twitter.com/LetsDefendIO/status/1774804387417751958"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://twitter.com/debian/status/1774219194638409898"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://twitter.com/infosecb/status/1774595540233167206"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://twitter.com/infosecb/status/1774597228864139400"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://ubuntu.com/security/CVE-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.cisa.gov/news-events/alerts/2024/03/29/reported-supply-chain-compromise-affecting-xz-utils-data-compression-library-cve-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.darkreading.com/vulnerabilities-threats/are-you-affected-by-the-backdoor-in-xz-utils"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.kali.org/blog/about-the-xz-backdoor/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.openwall.com/lists/oss-security/2024/03/29/4"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.redhat.com/en/blog/urgent-security-alert-fedora-41-and-rawhide-users"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.tenable.com/blog/frequently-asked-questions-cve-2024-3094-supply-chain-backdoor-in-xz-utils"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.theregister.com/2024/03/29/malicious_backdoor_xz/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://www.vicarius.io/vsociety/vulnerabilities/cve-2024-3094"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://xeiaso.net/notes/2024/xz-vuln/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/30/12"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/30/27"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/29/12"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/29/10"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/30/36"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/04/16/5"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/29/8"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/30/5"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/29/5"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2024/03/29/4"
+                }
+              ],
+              "title": "CVE Program Container",
+              "x_generator": {
+                "engine": "ADPogram 0.0.1"
+              }
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "collectionURL": "https://github.com/tukaani-project/xz",
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "5.6.0"
+                  },
+                  {
+                    "status": "affected",
+                    "version": "5.6.1"
+                  }
+                ]
+              },
+              {
+                "collectionURL": "https://access.redhat.com/downloads/content/package-browser/",
+                "cpes": [
+                  "cpe:/o:redhat:enterprise_linux:10"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat Enterprise Linux 10",
+                "vendor": "Red Hat"
+              },
+              {
+                "collectionURL": "https://access.redhat.com/downloads/content/package-browser/",
+                "cpes": [
+                  "cpe:/o:redhat:enterprise_linux:6"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat Enterprise Linux 6",
+                "vendor": "Red Hat"
+              },
+              {
+                "collectionURL": "https://access.redhat.com/downloads/content/package-browser/",
+                "cpes": [
+                  "cpe:/o:redhat:enterprise_linux:7"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat Enterprise Linux 7",
+                "vendor": "Red Hat"
+              },
+              {
+                "collectionURL": "https://access.redhat.com/downloads/content/package-browser/",
+                "cpes": [
+                  "cpe:/o:redhat:enterprise_linux:8"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat Enterprise Linux 8",
+                "vendor": "Red Hat"
+              },
+              {
+                "collectionURL": "https://access.redhat.com/downloads/content/package-browser/",
+                "cpes": [
+                  "cpe:/o:redhat:enterprise_linux:9"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat Enterprise Linux 9",
+                "vendor": "Red Hat"
+              },
+              {
+                "collectionURL": "https://access.redhat.com/jbossnetwork/restricted/listSoftware.html",
+                "cpes": [
+                  "cpe:/a:redhat:jboss_enterprise_application_platform:8"
+                ],
+                "defaultStatus": "unaffected",
+                "packageName": "xz",
+                "product": "Red Hat JBoss Enterprise Application Platform 8",
+                "vendor": "Red Hat"
+              }
+            ],
+            "credits": [
+              {
+                "lang": "en",
+                "value": "Red Hat would like to thank Andres Freund for reporting this issue."
+              }
+            ],
+            "datePublic": "2024-03-29T00:00:00.000Z",
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "Malicious code was discovered in the upstream tarballs of xz, starting with version 5.6.0. \r\nThrough a series of complex obfuscations, the liblzma build process extracts a prebuilt object file from a disguised test file existing in the source code, which is then used to modify specific functions in the liblzma code. This results in a modified liblzma library that can be used by any software linked against this library, intercepting and modifying the data interaction with this library."
+              }
+            ],
+            "metrics": [
+              {
+                "other": {
+                  "content": {
+                    "namespace": "https://access.redhat.com/security/updates/classification/",
+                    "value": "Critical"
+                  },
+                  "type": "Red Hat severity rating"
+                }
+              },
+              {
+                "cvssV3_1": {
+                  "attackComplexity": "LOW",
+                  "attackVector": "NETWORK",
+                  "availabilityImpact": "HIGH",
+                  "baseScore": 10,
+                  "baseSeverity": "CRITICAL",
+                  "confidentialityImpact": "HIGH",
+                  "integrityImpact": "HIGH",
+                  "privilegesRequired": "NONE",
+                  "scope": "CHANGED",
+                  "userInteraction": "NONE",
+                  "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+                  "version": "3.1"
+                },
+                "format": "CVSS"
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-506",
+                    "description": "Embedded Malicious Code",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2025-11-20T07:17:48.594Z",
+              "orgId": "53f830b8-0a3f-465b-8143-3b8a9948e749",
+              "shortName": "redhat"
+            },
+            "references": [
+              {
+                "tags": [
+                  "vdb-entry",
+                  "x_refsource_REDHAT"
+                ],
+                "url": "https://access.redhat.com/security/cve/CVE-2024-3094"
+              },
+              {
+                "name": "RHBZ#2272210",
+                "tags": [
+                  "issue-tracking",
+                  "x_refsource_REDHAT"
+                ],
+                "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2272210"
+              },
+              {
+                "url": "https://www.openwall.com/lists/oss-security/2024/03/29/4"
+              },
+              {
+                "url": "https://www.redhat.com/en/blog/urgent-security-alert-fedora-41-and-rawhide-users"
+              }
+            ],
+            "timeline": [
+              {
+                "lang": "en",
+                "time": "2024-03-27T00:00:00.000Z",
+                "value": "Reported to Red Hat."
+              },
+              {
+                "lang": "en",
+                "time": "2024-03-29T00:00:00.000Z",
+                "value": "Made public."
+              }
+            ],
+            "title": "Xz: malicious code in distributed source",
+            "x_redhatCweChain": "CWE-506: Embedded Malicious Code"
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "53f830b8-0a3f-465b-8143-3b8a9948e749",
+          "assignerShortName": "redhat",
+          "cveId": "CVE-2024-3094",
+          "datePublished": "2024-03-29T16:51:12.588Z",
+          "dateReserved": "2024-03-29T15:38:13.249Z",
+          "dateUpdated": "2025-11-20T07:17:48.594Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.2"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2024/3xxx/CVE-2024-3094.json",
+      "english_descriptions": [
+        "Malicious code was discovered in the upstream tarballs of xz, starting with version 5.6.0. \r\nThrough a series of complex obfuscations, the liblzma build process extracts a prebuilt object file from a disguised test file existing in the source code, which is then used to modify specific functions in the liblzma code. This results in a modified liblzma library that can be used by any software linked against this library, intercepting and modifying the data interaction with this library."
+      ],
+      "reference_urls": [
+        "https://access.redhat.com/security/cve/CVE-2024-3094",
+        "https://bugzilla.redhat.com/show_bug.cgi?id=2272210",
+        "https://www.openwall.com/lists/oss-security/2024/03/29/4",
+        "https://www.redhat.com/en/blog/urgent-security-alert-fedora-41-and-rawhide-users"
+      ],
+      "status_at_snapshot": "historical",
+      "upstream_advisory_text": "   tukaani.org \u00bb XZ Utils backdoor\n     __________________________________________________________________\n\nXZ Utils backdoor\n\n   Lasse Collin\n\n   This page will get updated as I learn more about the incident.\n\nFacts\n\n     * CVE-2024-3094\n     * XZ Utils 5.6.0 and 5.6.1 release tarballs contain a backdoor. These\n       tarballs were created and signed by Jia Tan.\n     * Tarballs created by Jia Tan were signed by him. Any tarballs signed\n       by me were created by me.\n     * GitHub accounts of both me (Larhzu) and Jia Tan were suspended.\n       Mine was reinstated on 2024-04-02.\n     * Only I have had access to the main tukaani.org website,\n       git.tukaani.org repositories, and related files. Jia Tan only had\n       access to things hosted on GitHub, including xz.tukaani.org\n       subdomain (and only that subdomain).\n     * The XZ projects have been moved to their old URLs on tukaani.org.\n       XZ Utils\u2019s home page is under construction still though.\n     * xz.tukaani.org DNS name (CNAME) has been removed and won\u2019t be\n       restored.\n     * The email address xz at tukaani dot org no longer forwards to Jia\n       Tan. This change was made on 2024-03-30.\n     * 2024-04-09: The Git repositories of XZ projects are available on\n       GitHub again. Please use these for downloading the code to reduce\n       the bandwidth usage on git.tukaani.org.\n     * GitHub had closed all pull requests and marked them as if I had\n       closed them on 2024-04-05. I didn\u2019t close any PRs on that day,\n       GitHub just misattributed it to me. On 2024-04-12 I tried to\n       re-open PRs and GitHub immediately closed them again, again marking\n       them as if I had done it. (On IRC it was suggested that this might\n       have happened because the PRs refer to forks that are disabled.)\n     * After the primary location of xz.git was officially moved to\n       GitHub, I didn\u2019t detected any force pushes to the master or v5.x\n       branches. I haven\u2019t force pushed to git.tukaani.org.\n     * However, I force pushed to the xz-java repository on GitHub on\n       2024-04-05, deleting two harmless commits by Jia. I had pushed\n       commits to git.tukaani.org when the repositories on GitHub were\n       disabled and I didn\u2019t have the two commits by Jia available\n       locally.\n     * The version 1.0 of the XZ Utils review notes was published on\n       2024-05-29. (The first work-in-progress version was published on\n       2024-04-15.)\n     * New, clean XZ Utils releases were made on 2024-05-29. The home page\n       is available again too.\n\nTo media and reporters\n\n   I won\u2019t reply for now. I might reconsider after my planned article is\n   out.\n\nEmail\n\n   I have gotten a lot of email. Thanks for the positive comments.\n   Unfortunately I don\u2019t have time to reply to most of them.\n\nDonations\n\n   Updated on 2025-01-17: I have created an account on Liberapay.\n   Note\n   Due to the Finnish money collection act, I do not accept donations from\n   Finns or people living in Finland.\n\n   See my message on GitHub for more information.\n\nPlans\n\nGit repositories\n\n   There was discussion if the master branch should have been rebased to\n   purge the malicious files. This would have been equivalent to dropping\n   eight commits. The main benefit would have been that then antivirus\n   software wouldn\u2019t complain about them. Otherwise the files are harmless\n   without the trigger code that was never included in the Git repository.\n\n   It was decided that the Git repository will not be rebased.\n\n   The other Git repositories (xz-embedded and xz-java) are fine and never\n   had malicious or suspicious content.\n\nReleases\n\n   There was discussion if the 5.6.x version numbers shouldn\u2019t be used\n   further and the next release could be 5.8.0. However, it felt clearer\n   to make XZ Utils 5.6.2 as a cleanup step. There are a few small\n   improvements planned which could become 5.8.0 in shorter time than\n   usual, hopefully replacing 5.6.x somewhat soon.\n\nWhat can be learned from this\n\n   I\u2019m writing an article how the backdoor got into the releases and what\n   can be learned from this. This is taking much longer than I had\n   thought. I\u2019ve made progress but I don\u2019t want to estimate when it\u2019s\n   ready.\n\nLinks\n\n     * Details by Andres Freund\n     * FAQ by Sam James\n     * Gentoo bug 928134\n     * Debian bug 1068024\n\n   Last updated 2025-01-17 20:55:55 +0200\n     __________________________________________________________________\n\n   tukaani.org \u00bb XZ Utils backdoor",
+      "upstream_advisory_url": "https://tukaani.org/xz-backdoor/",
+      "why_included": "Backdoor in the liblzma build shipped in XZ Utils 5.6.0 and 5.6.1 release tarballs."
+    },
+    {
+      "affects_liblzma": true,
+      "cve_id": "CVE-2025-31115",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "metrics": [
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2025-31115",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "no"
+                        },
+                        {
+                          "Technical Impact": "partial"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2025-04-03T17:57:35.541572Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2025-04-03T17:58:59.148Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            },
+            {
+              "providerMetadata": {
+                "dateUpdated": "2025-04-03T20:03:09.458Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "url": "http://www.openwall.com/lists/oss-security/2025/04/03/1"
+                },
+                {
+                  "url": "http://www.openwall.com/lists/oss-security/2025/04/03/2"
+                },
+                {
+                  "url": "http://www.openwall.com/lists/oss-security/2025/04/03/3"
+                }
+              ],
+              "title": "CVE Program Container"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "xz",
+                "vendor": "tukaani-project",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": ">= 5.3.3alpha, < 5.8.1"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "XZ Utils provide a general-purpose data-compression library plus command-line tools. In XZ Utils 5.3.3alpha to 5.8.0, the multithreaded .xz decoder in liblzma has a bug where invalid input can at least result in a crash. The effects include heap use after free and writing to an address based on the null pointer plus an offset. Applications and libraries that use the lzma_stream_decoder_mt function are affected. The bug has been fixed in XZ Utils 5.8.1, and the fix has been committed to the v5.4, v5.6, v5.8, and master branches in the xz Git repository. No new release packages will be made from the old stable branches, but a standalone patch is available that applies to all affected releases."
+              }
+            ],
+            "metrics": [
+              {
+                "cvssV4_0": {
+                  "attackComplexity": "LOW",
+                  "attackRequirements": "NONE",
+                  "attackVector": "NETWORK",
+                  "baseScore": 8.7,
+                  "baseSeverity": "HIGH",
+                  "privilegesRequired": "NONE",
+                  "subAvailabilityImpact": "NONE",
+                  "subConfidentialityImpact": "NONE",
+                  "subIntegrityImpact": "NONE",
+                  "userInteraction": "NONE",
+                  "vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N",
+                  "version": "4.0",
+                  "vulnAvailabilityImpact": "HIGH",
+                  "vulnConfidentialityImpact": "NONE",
+                  "vulnIntegrityImpact": "NONE"
+                }
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-366",
+                    "description": "CWE-366: Race Condition within a Thread",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              },
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-416",
+                    "description": "CWE-416: Use After Free",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              },
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-476",
+                    "description": "CWE-476: NULL Pointer Dereference",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              },
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-826",
+                    "description": "CWE-826: Premature Release of Resource During Expected Lifetime",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2025-04-03T16:57:05.488Z",
+              "orgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+              "shortName": "GitHub_M"
+            },
+            "references": [
+              {
+                "name": "https://github.com/tukaani-project/xz/security/advisories/GHSA-6cc8-p5mm-29w2",
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://github.com/tukaani-project/xz/security/advisories/GHSA-6cc8-p5mm-29w2"
+              },
+              {
+                "name": "https://github.com/tukaani-project/xz/commit/d5a2ffe41bb77b918a8c96084885d4dbe4bf6480",
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://github.com/tukaani-project/xz/commit/d5a2ffe41bb77b918a8c96084885d4dbe4bf6480"
+              },
+              {
+                "name": "https://tukaani.org/xz/xz-cve-2025-31115.patch",
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://tukaani.org/xz/xz-cve-2025-31115.patch"
+              }
+            ],
+            "source": {
+              "advisory": "GHSA-6cc8-p5mm-29w2",
+              "discovery": "UNKNOWN"
+            },
+            "title": "XZ has a heap-use-after-free bug in threaded .xz decoder"
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+          "assignerShortName": "GitHub_M",
+          "cveId": "CVE-2025-31115",
+          "datePublished": "2025-04-03T16:57:05.488Z",
+          "dateReserved": "2025-03-26T15:04:52.624Z",
+          "dateUpdated": "2025-04-03T20:03:09.458Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.1"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2025/31xxx/CVE-2025-31115.json",
+      "english_descriptions": [
+        "XZ Utils provide a general-purpose data-compression library plus command-line tools. In XZ Utils 5.3.3alpha to 5.8.0, the multithreaded .xz decoder in liblzma has a bug where invalid input can at least result in a crash. The effects include heap use after free and writing to an address based on the null pointer plus an offset. Applications and libraries that use the lzma_stream_decoder_mt function are affected. The bug has been fixed in XZ Utils 5.8.1, and the fix has been committed to the v5.4, v5.6, v5.8, and master branches in the xz Git repository. No new release packages will be made from the old stable branches, but a standalone patch is available that applies to all affected releases."
+      ],
+      "reference_urls": [
+        "https://github.com/tukaani-project/xz/security/advisories/GHSA-6cc8-p5mm-29w2",
+        "https://github.com/tukaani-project/xz/commit/d5a2ffe41bb77b918a8c96084885d4dbe4bf6480",
+        "https://tukaani.org/xz/xz-cve-2025-31115.patch"
+      ],
+      "status_at_snapshot": "historical",
+      "upstream_advisory_text": "   tukaani.org \u00bb XZ Utils \u00bb CVE-2025-31115\n     __________________________________________________________________\n\nCVE-2025-31115: Threaded .xz decoder frees memory too early\n\n   2025-04-03\n\n   In XZ Utils 5.3.3alpha to 5.8.0, the multithreaded .xz decoder in\n   liblzma has a bug where invalid input can at least result in a crash\n   (CVE-2025-31115). The effects include heap use after free and writing\n   to an address based on the null pointer plus an offset. Applications\n   and libraries that use the lzma_stream_decoder_mt function are\n   affected.\n\n   The bug has been fixed in XZ Utils 5.8.1, and the fix has been\n   committed to the v5.4, v5.6, v5.8, and master branches in the xz Git\n   repository. No new release packages will be made from the old stable\n   branches, but a patch is available that applies to all affected\n   releases:\n\n   xz-cve-2025-31115.patch \u2014 signature\n\n   The single-threaded .xz decoder (lzma_stream_decoder) isn\u2019t affected.\n   The commands xz --decompress --threads=1 and xzdec use the\n   single-threaded decoder.\n\nCredits\n\n   Thanks to Harri K. Koskinen for discovering and reporting this issue.\n\n   Thanks to Sebastian Andrzej Siewior for reviewing the patches.\n\n   Thanks to Sam James for general help.\n\nWhy fuzzing didn\u2019t find this?\n\n   XZ Utils is fuzzed by OSS-Fuzz. However, there was no program to fuzz\n   the multithreaded .xz decoder. Even if there had been, it likely would\n   have used the fuzz_code function in fuzz_common.h like the existing\n   fuzz targets did. That function called lzma_code in such a way that it\n   would have been impossible to trigger this particular bug. A fuzzer has\n   been added and fuzz_common.h has been modified.\n     __________________________________________________________________\n\n   tukaani.org \u00bb XZ Utils \u00bb CVE-2025-31115",
+      "upstream_advisory_url": "https://tukaani.org/xz/threaded-decoder-early-free.html",
+      "why_included": "The multithreaded .xz decoder in liblzma can crash or corrupt memory on invalid input."
+    },
+    {
+      "affects_liblzma": true,
+      "cve_id": "CVE-2026-34743",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "providerMetadata": {
+                "dateUpdated": "2026-04-02T19:24:10.537Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "url": "http://www.openwall.com/lists/oss-security/2026/03/31/13"
+                }
+              ],
+              "title": "CVE Program Container"
+            },
+            {
+              "metrics": [
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2026-34743",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "yes"
+                        },
+                        {
+                          "Technical Impact": "partial"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2026-04-03T12:58:58.398176Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2026-04-03T12:59:06.096Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "xz",
+                "vendor": "tukaani-project",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "< 5.8.3"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "XZ Utils provide a general-purpose data-compression library plus command-line tools. Prior to version 5.8.3, if lzma_index_decoder() was used to decode an Index that contained no Records, the resulting lzma_index was left in a state where where a subsequent lzma_index_append() would allocate too little memory, and a buffer overflow would occur. This issue has been patched in version 5.8.3."
+              }
+            ],
+            "metrics": [
+              {
+                "cvssV4_0": {
+                  "attackComplexity": "LOW",
+                  "attackRequirements": "PRESENT",
+                  "attackVector": "NETWORK",
+                  "baseScore": 1.7,
+                  "baseSeverity": "LOW",
+                  "privilegesRequired": "NONE",
+                  "subAvailabilityImpact": "NONE",
+                  "subConfidentialityImpact": "NONE",
+                  "subIntegrityImpact": "NONE",
+                  "userInteraction": "NONE",
+                  "vectorString": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N/E:U",
+                  "version": "4.0",
+                  "vulnAvailabilityImpact": "LOW",
+                  "vulnConfidentialityImpact": "NONE",
+                  "vulnIntegrityImpact": "NONE"
+                }
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-122",
+                    "description": "CWE-122: Heap-based Buffer Overflow",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2026-04-02T18:36:37.450Z",
+              "orgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+              "shortName": "GitHub_M"
+            },
+            "references": [
+              {
+                "name": "https://github.com/tukaani-project/xz/security/advisories/GHSA-x872-m794-cxhv",
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://github.com/tukaani-project/xz/security/advisories/GHSA-x872-m794-cxhv"
+              },
+              {
+                "name": "https://github.com/tukaani-project/xz/commit/c8c22869e780ff57c96b46939c3d79ff99395f87",
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://github.com/tukaani-project/xz/commit/c8c22869e780ff57c96b46939c3d79ff99395f87"
+              },
+              {
+                "name": "https://github.com/tukaani-project/xz/releases/tag/v5.8.3",
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://github.com/tukaani-project/xz/releases/tag/v5.8.3"
+              }
+            ],
+            "source": {
+              "advisory": "GHSA-x872-m794-cxhv",
+              "discovery": "UNKNOWN"
+            },
+            "title": "XZ Utils: Buffer overflow in lzma_index_append()"
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+          "assignerShortName": "GitHub_M",
+          "cveId": "CVE-2026-34743",
+          "datePublished": "2026-04-02T18:36:37.450Z",
+          "dateReserved": "2026-03-30T19:17:10.224Z",
+          "dateUpdated": "2026-04-03T12:59:06.096Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.2"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2026/34xxx/CVE-2026-34743.json",
+      "english_descriptions": [
+        "XZ Utils provide a general-purpose data-compression library plus command-line tools. Prior to version 5.8.3, if lzma_index_decoder() was used to decode an Index that contained no Records, the resulting lzma_index was left in a state where where a subsequent lzma_index_append() would allocate too little memory, and a buffer overflow would occur. This issue has been patched in version 5.8.3."
+      ],
+      "reference_urls": [
+        "https://github.com/tukaani-project/xz/security/advisories/GHSA-x872-m794-cxhv",
+        "https://github.com/tukaani-project/xz/commit/c8c22869e780ff57c96b46939c3d79ff99395f87",
+        "https://github.com/tukaani-project/xz/releases/tag/v5.8.3"
+      ],
+      "status_at_snapshot": "current",
+      "upstream_advisory_text": "   tukaani.org \u00bb XZ Utils \u00bb CVE-2026-34743\n     __________________________________________________________________\n\nCVE-2026-34743: Buffer overflow in lzma_index_append()\n\n   2026-03-31\n\n   In XZ Utils 5.8.2 and older, if lzma_index_decoder() was used to decode\n   an Index that contained no Records, the resulting lzma_index was left\n   in a state where where a subsequent lzma_index_append() would allocate\n   too little memory, and a buffer overflow would occur (CVE-2026-34743).\n\n   The lzma_index functions are rarely used by applications directly. In\n   the few applications that do use these functions, the combination of\n   function calls required to trigger this bug are unlikely to exist,\n   because there typically is no reason to append Records to a decoded\n   lzma_index. Thus, it\u2019s likely that this bug cannot be triggered in any\n   real-world application.\n\n   The bug was fixed in XZ Utils 5.8.3. The fix is also in the Git\n   repository branches master, v5.8, v5.6, v5.4, and v5.2.\n\nCredits\n\n   The bug was reported and discovered by Cantina using their AppSec\n   agent, Apex.\n\n   Thanks to Sam James for general help.\n     __________________________________________________________________\n\n   tukaani.org \u00bb XZ Utils \u00bb CVE-2026-34743",
+      "upstream_advisory_url": "https://tukaani.org/xz/index-append-overflow.html",
+      "why_included": "Buffer overflow in liblzma index handling after decoding an empty Index and then appending a Record."
+    }
+  ],
+  "library": "liblzma",
+  "project": "XZ Utils",
+  "retrieved_at_utc": "2026-04-05T17:22:10+00:00",
+  "reviewed_but_excluded": [
+    {
+      "affects_liblzma": false,
+      "cve_id": "CVE-2024-47611",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "affected": [
+                {
+                  "cpes": [
+                    "cpe:2.3:a:tukaani:xz:*:*:*:*:*:*:*:*"
+                  ],
+                  "defaultStatus": "unknown",
+                  "product": "xz",
+                  "vendor": "tukaani",
+                  "versions": [
+                    {
+                      "lessThan": "5.6.3",
+                      "status": "affected",
+                      "version": "0",
+                      "versionType": "custom"
+                    }
+                  ]
+                }
+              ],
+              "metrics": [
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2024-47611",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "yes"
+                        },
+                        {
+                          "Technical Impact": "partial"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2024-10-02T15:28:51.836849Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2024-11-21T16:55:27.310Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "xz",
+                "vendor": "tukaani-project",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "< 5.6.3"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "XZ Utils provide a general-purpose data-compression library plus command-line tools. When built for native Windows (MinGW-w64 or MSVC), the command line tools from XZ Utils 5.6.2 and older have a command line argument injection vulnerability. If a command line contains Unicode characters (for example, filenames) that don't exist in the current legacy code page, the characters are converted to similar-looking characters with best-fit mapping. Some best-fit mappings result in ASCII characters that change the meaning of the command line, which can be exploited with malicious filenames to do argument injection or directory traversal attacks. This vulnerability is fixed in 5.6.3. Command line tools built for Cygwin or MSYS2 are unaffected. liblzma is unaffected."
+              }
+            ],
+            "metrics": [
+              {
+                "cvssV4_0": {
+                  "attackComplexity": "LOW",
+                  "attackRequirements": "PRESENT",
+                  "attackVector": "NETWORK",
+                  "baseScore": 6.3,
+                  "baseSeverity": "MEDIUM",
+                  "privilegesRequired": "NONE",
+                  "subAvailabilityImpact": "NONE",
+                  "subConfidentialityImpact": "NONE",
+                  "subIntegrityImpact": "NONE",
+                  "userInteraction": "NONE",
+                  "vectorString": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N",
+                  "version": "4.0",
+                  "vulnAvailabilityImpact": "LOW",
+                  "vulnConfidentialityImpact": "LOW",
+                  "vulnIntegrityImpact": "LOW"
+                }
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-88",
+                    "description": "CWE-88: Improper Neutralization of Argument Delimiters in a Command ('Argument Injection')",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              },
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-176",
+                    "description": "CWE-176: Improper Handling of Unicode Encoding",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2024-10-02T14:16:07.318Z",
+              "orgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+              "shortName": "GitHub_M"
+            },
+            "references": [
+              {
+                "name": "https://github.com/tukaani-project/xz/security/advisories/GHSA-m538-c5qw-3cg4",
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://github.com/tukaani-project/xz/security/advisories/GHSA-m538-c5qw-3cg4"
+              },
+              {
+                "name": "https://github.com/tukaani-project/xz/commit/bf518b9ba446327a062ddfe67e7e0a5baed2394f",
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://github.com/tukaani-project/xz/commit/bf518b9ba446327a062ddfe67e7e0a5baed2394f"
+              }
+            ],
+            "source": {
+              "advisory": "GHSA-m538-c5qw-3cg4",
+              "discovery": "UNKNOWN"
+            },
+            "title": "XZ Utils on Microsoft Windows platform are vulnerable to argument injection"
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "a0819718-46f1-4df5-94e2-005712e83aaa",
+          "assignerShortName": "GitHub_M",
+          "cveId": "CVE-2024-47611",
+          "datePublished": "2024-10-02T14:16:07.318Z",
+          "dateReserved": "2024-09-27T20:37:22.120Z",
+          "dateUpdated": "2024-11-21T16:55:27.310Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.1"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2024/47xxx/CVE-2024-47611.json",
+      "english_descriptions": [
+        "XZ Utils provide a general-purpose data-compression library plus command-line tools. When built for native Windows (MinGW-w64 or MSVC), the command line tools from XZ Utils 5.6.2 and older have a command line argument injection vulnerability. If a command line contains Unicode characters (for example, filenames) that don't exist in the current legacy code page, the characters are converted to similar-looking characters with best-fit mapping. Some best-fit mappings result in ASCII characters that change the meaning of the command line, which can be exploited with malicious filenames to do argument injection or directory traversal attacks. This vulnerability is fixed in 5.6.3. Command line tools built for Cygwin or MSYS2 are unaffected. liblzma is unaffected."
+      ],
+      "evidence_url": "https://tukaani.org/xz/",
+      "reference_urls": [
+        "https://github.com/tukaani-project/xz/security/advisories/GHSA-m538-c5qw-3cg4",
+        "https://github.com/tukaani-project/xz/commit/bf518b9ba446327a062ddfe67e7e0a5baed2394f"
+      ],
+      "why_excluded": "Official XZ advisory and the CNA description both say liblzma is unaffected; this is a Windows command-line tool issue."
+    },
+    {
+      "affects_liblzma": false,
+      "cve_id": "CVE-2022-1271",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "providerMetadata": {
+                "dateUpdated": "2024-08-02T23:55:24.665Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2073310"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://www.openwall.com/lists/oss-security/2022/04/07/8"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://lists.gnu.org/r/bug-gzip/2022-04/msg00011.html"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://tukaani.org/xz/xzgrep-ZDI-CAN-16587.patch"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://git.tukaani.org/?p=xz.git%3Ba=commit%3Bh=69d1b3fc29677af8ade8dc15dba83f0589cb63d6"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://security-tracker.debian.org/tracker/CVE-2022-1271"
+                },
+                {
+                  "tags": [
+                    "x_refsource_MISC",
+                    "x_transferred"
+                  ],
+                  "url": "https://access.redhat.com/security/cve/CVE-2022-1271"
+                },
+                {
+                  "name": "GLSA-202209-01",
+                  "tags": [
+                    "vendor-advisory",
+                    "x_refsource_GENTOO",
+                    "x_transferred"
+                  ],
+                  "url": "https://security.gentoo.org/glsa/202209-01"
+                },
+                {
+                  "tags": [
+                    "x_refsource_CONFIRM",
+                    "x_transferred"
+                  ],
+                  "url": "https://security.netapp.com/advisory/ntap-20220930-0006/"
+                }
+              ],
+              "title": "CVE Program Container"
+            },
+            {
+              "metrics": [
+                {
+                  "cvssV3_1": {
+                    "attackComplexity": "LOW",
+                    "attackVector": "NETWORK",
+                    "availabilityImpact": "HIGH",
+                    "baseScore": 8.8,
+                    "baseSeverity": "HIGH",
+                    "confidentialityImpact": "HIGH",
+                    "integrityImpact": "HIGH",
+                    "privilegesRequired": "LOW",
+                    "scope": "UNCHANGED",
+                    "userInteraction": "NONE",
+                    "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+                    "version": "3.1"
+                  }
+                },
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2022-1271",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "no"
+                        },
+                        {
+                          "Technical Impact": "total"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2025-06-09T14:55:46.489089Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2025-06-09T14:56:35.875Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "gzip, xz-utils",
+                "vendor": "n/a",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "Fixed in gzip 1.12"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "An arbitrary file write vulnerability was found in GNU gzip's zgrep utility. When zgrep is applied on the attacker's chosen file name (for example, a crafted file name), this can overwrite an attacker's content to an arbitrary attacker-selected file. This flaw occurs due to insufficient validation when processing filenames with two or more newlines where selected content and the target file names are embedded in crafted multi-line file names. This flaw allows a remote, low privileged attacker to force zgrep to write arbitrary files on the system."
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-179",
+                    "description": "CWE-179 - Incorrect Behavior Order: Early Validation, CWE-1173 Improper Use of Validation Framework",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2022-09-30T15:06:11.000Z",
+              "orgId": "53f830b8-0a3f-465b-8143-3b8a9948e749",
+              "shortName": "redhat"
+            },
+            "references": [
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2073310"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://www.openwall.com/lists/oss-security/2022/04/07/8"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://lists.gnu.org/r/bug-gzip/2022-04/msg00011.html"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://tukaani.org/xz/xzgrep-ZDI-CAN-16587.patch"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://git.tukaani.org/?p=xz.git%3Ba=commit%3Bh=69d1b3fc29677af8ade8dc15dba83f0589cb63d6"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://security-tracker.debian.org/tracker/CVE-2022-1271"
+              },
+              {
+                "tags": [
+                  "x_refsource_MISC"
+                ],
+                "url": "https://access.redhat.com/security/cve/CVE-2022-1271"
+              },
+              {
+                "name": "GLSA-202209-01",
+                "tags": [
+                  "vendor-advisory",
+                  "x_refsource_GENTOO"
+                ],
+                "url": "https://security.gentoo.org/glsa/202209-01"
+              },
+              {
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://security.netapp.com/advisory/ntap-20220930-0006/"
+              }
+            ],
+            "x_legacyV4Record": {
+              "CVE_data_meta": {
+                "ASSIGNER": "secalert@redhat.com",
+                "ID": "CVE-2022-1271",
+                "STATE": "PUBLIC"
+              },
+              "affects": {
+                "vendor": {
+                  "vendor_data": [
+                    {
+                      "product": {
+                        "product_data": [
+                          {
+                            "product_name": "gzip, xz-utils",
+                            "version": {
+                              "version_data": [
+                                {
+                                  "version_value": "Fixed in gzip 1.12"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "vendor_name": "n/a"
+                    }
+                  ]
+                }
+              },
+              "data_format": "MITRE",
+              "data_type": "CVE",
+              "data_version": "4.0",
+              "description": {
+                "description_data": [
+                  {
+                    "lang": "eng",
+                    "value": "An arbitrary file write vulnerability was found in GNU gzip's zgrep utility. When zgrep is applied on the attacker's chosen file name (for example, a crafted file name), this can overwrite an attacker's content to an arbitrary attacker-selected file. This flaw occurs due to insufficient validation when processing filenames with two or more newlines where selected content and the target file names are embedded in crafted multi-line file names. This flaw allows a remote, low privileged attacker to force zgrep to write arbitrary files on the system."
+                  }
+                ]
+              },
+              "problemtype": {
+                "problemtype_data": [
+                  {
+                    "description": [
+                      {
+                        "lang": "eng",
+                        "value": "CWE-179 - Incorrect Behavior Order: Early Validation, CWE-1173 Improper Use of Validation Framework"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "references": {
+                "reference_data": [
+                  {
+                    "name": "https://bugzilla.redhat.com/show_bug.cgi?id=2073310",
+                    "refsource": "MISC",
+                    "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2073310"
+                  },
+                  {
+                    "name": "https://www.openwall.com/lists/oss-security/2022/04/07/8",
+                    "refsource": "MISC",
+                    "url": "https://www.openwall.com/lists/oss-security/2022/04/07/8"
+                  },
+                  {
+                    "name": "https://lists.gnu.org/r/bug-gzip/2022-04/msg00011.html",
+                    "refsource": "MISC",
+                    "url": "https://lists.gnu.org/r/bug-gzip/2022-04/msg00011.html"
+                  },
+                  {
+                    "name": "https://tukaani.org/xz/xzgrep-ZDI-CAN-16587.patch",
+                    "refsource": "MISC",
+                    "url": "https://tukaani.org/xz/xzgrep-ZDI-CAN-16587.patch"
+                  },
+                  {
+                    "name": "https://git.tukaani.org/?p=xz.git;a=commit;h=69d1b3fc29677af8ade8dc15dba83f0589cb63d6",
+                    "refsource": "MISC",
+                    "url": "https://git.tukaani.org/?p=xz.git;a=commit;h=69d1b3fc29677af8ade8dc15dba83f0589cb63d6"
+                  },
+                  {
+                    "name": "https://security-tracker.debian.org/tracker/CVE-2022-1271",
+                    "refsource": "MISC",
+                    "url": "https://security-tracker.debian.org/tracker/CVE-2022-1271"
+                  },
+                  {
+                    "name": "https://access.redhat.com/security/cve/CVE-2022-1271",
+                    "refsource": "MISC",
+                    "url": "https://access.redhat.com/security/cve/CVE-2022-1271"
+                  },
+                  {
+                    "name": "GLSA-202209-01",
+                    "refsource": "GENTOO",
+                    "url": "https://security.gentoo.org/glsa/202209-01"
+                  },
+                  {
+                    "name": "https://security.netapp.com/advisory/ntap-20220930-0006/",
+                    "refsource": "CONFIRM",
+                    "url": "https://security.netapp.com/advisory/ntap-20220930-0006/"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "53f830b8-0a3f-465b-8143-3b8a9948e749",
+          "assignerShortName": "redhat",
+          "cveId": "CVE-2022-1271",
+          "datePublished": "2022-08-31T15:33:00.000Z",
+          "dateReserved": "2022-04-07T00:00:00.000Z",
+          "dateUpdated": "2025-06-09T14:56:35.875Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.1"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2022/1xxx/CVE-2022-1271.json",
+      "english_descriptions": [
+        "An arbitrary file write vulnerability was found in GNU gzip's zgrep utility. When zgrep is applied on the attacker's chosen file name (for example, a crafted file name), this can overwrite an attacker's content to an arbitrary attacker-selected file. This flaw occurs due to insufficient validation when processing filenames with two or more newlines where selected content and the target file names are embedded in crafted multi-line file names. This flaw allows a remote, low privileged attacker to force zgrep to write arbitrary files on the system."
+      ],
+      "evidence_url": "https://tukaani.org/xz/",
+      "reference_urls": [
+        "https://bugzilla.redhat.com/show_bug.cgi?id=2073310",
+        "https://www.openwall.com/lists/oss-security/2022/04/07/8",
+        "https://lists.gnu.org/r/bug-gzip/2022-04/msg00011.html",
+        "https://tukaani.org/xz/xzgrep-ZDI-CAN-16587.patch",
+        "https://git.tukaani.org/?p=xz.git%3Ba=commit%3Bh=69d1b3fc29677af8ade8dc15dba83f0589cb63d6",
+        "https://security-tracker.debian.org/tracker/CVE-2022-1271",
+        "https://access.redhat.com/security/cve/CVE-2022-1271",
+        "https://security.gentoo.org/glsa/202209-01",
+        "https://security.netapp.com/advisory/ntap-20220930-0006/"
+      ],
+      "why_excluded": "Affects xzgrep filename handling, not the liblzma library."
+    },
+    {
+      "affects_liblzma": false,
+      "cve_id": "CVE-2015-4035",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "providerMetadata": {
+                "dateUpdated": "2024-08-06T06:04:02.701Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "name": "[oss-security] 20150518 CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                  "tags": [
+                    "mailing-list",
+                    "x_refsource_MLIST",
+                    "x_transferred"
+                  ],
+                  "url": "http://seclists.org/oss-sec/2015/q2/484"
+                },
+                {
+                  "tags": [
+                    "x_refsource_CONFIRM",
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.redhat.com/show_bug.cgi?id=1223341"
+                },
+                {
+                  "tags": [
+                    "x_refsource_CONFIRM",
+                    "x_transferred"
+                  ],
+                  "url": "https://git.tukaani.org/?p=xz.git%3Ba=commitdiff%3Bh=f4b2b52624b802c786e4e2a8eb6895794dd93b24"
+                },
+                {
+                  "name": "[oss-security] 20150519 Re: CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                  "tags": [
+                    "mailing-list",
+                    "x_refsource_MLIST",
+                    "x_transferred"
+                  ],
+                  "url": "http://www.openwall.com/lists/oss-security/2015/05/19/13"
+                }
+              ],
+              "title": "CVE Program Container"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "n/a",
+                "vendor": "n/a",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "n/a"
+                  }
+                ]
+              }
+            ],
+            "datePublic": "2015-05-20T00:00:00.000Z",
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "scripts/xzgrep.in in xzgrep 5.2.x before 5.2.0, before 5.0.0 does not properly process file names containing semicolons, which allows remote attackers to execute arbitrary code by having a user run xzgrep on a crafted file name."
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "description": "n/a",
+                    "lang": "en",
+                    "type": "text"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2017-07-25T17:57:01.000Z",
+              "orgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+              "shortName": "mitre"
+            },
+            "references": [
+              {
+                "name": "[oss-security] 20150518 CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                "tags": [
+                  "mailing-list",
+                  "x_refsource_MLIST"
+                ],
+                "url": "http://seclists.org/oss-sec/2015/q2/484"
+              },
+              {
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://bugzilla.redhat.com/show_bug.cgi?id=1223341"
+              },
+              {
+                "tags": [
+                  "x_refsource_CONFIRM"
+                ],
+                "url": "https://git.tukaani.org/?p=xz.git%3Ba=commitdiff%3Bh=f4b2b52624b802c786e4e2a8eb6895794dd93b24"
+              },
+              {
+                "name": "[oss-security] 20150519 Re: CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                "tags": [
+                  "mailing-list",
+                  "x_refsource_MLIST"
+                ],
+                "url": "http://www.openwall.com/lists/oss-security/2015/05/19/13"
+              }
+            ],
+            "x_legacyV4Record": {
+              "CVE_data_meta": {
+                "ASSIGNER": "cve@mitre.org",
+                "ID": "CVE-2015-4035",
+                "STATE": "PUBLIC"
+              },
+              "affects": {
+                "vendor": {
+                  "vendor_data": [
+                    {
+                      "product": {
+                        "product_data": [
+                          {
+                            "product_name": "n/a",
+                            "version": {
+                              "version_data": [
+                                {
+                                  "version_value": "n/a"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "vendor_name": "n/a"
+                    }
+                  ]
+                }
+              },
+              "data_format": "MITRE",
+              "data_type": "CVE",
+              "data_version": "4.0",
+              "description": {
+                "description_data": [
+                  {
+                    "lang": "eng",
+                    "value": "scripts/xzgrep.in in xzgrep 5.2.x before 5.2.0, before 5.0.0 does not properly process file names containing semicolons, which allows remote attackers to execute arbitrary code by having a user run xzgrep on a crafted file name."
+                  }
+                ]
+              },
+              "problemtype": {
+                "problemtype_data": [
+                  {
+                    "description": [
+                      {
+                        "lang": "eng",
+                        "value": "n/a"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "references": {
+                "reference_data": [
+                  {
+                    "name": "[oss-security] 20150518 CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                    "refsource": "MLIST",
+                    "url": "http://seclists.org/oss-sec/2015/q2/484"
+                  },
+                  {
+                    "name": "https://bugzilla.redhat.com/show_bug.cgi?id=1223341",
+                    "refsource": "CONFIRM",
+                    "url": "https://bugzilla.redhat.com/show_bug.cgi?id=1223341"
+                  },
+                  {
+                    "name": "https://git.tukaani.org/?p=xz.git;a=commitdiff;h=f4b2b52624b802c786e4e2a8eb6895794dd93b24",
+                    "refsource": "CONFIRM",
+                    "url": "https://git.tukaani.org/?p=xz.git;a=commitdiff;h=f4b2b52624b802c786e4e2a8eb6895794dd93b24"
+                  },
+                  {
+                    "name": "[oss-security] 20150519 Re: CVE request: xzgrep 4.999.9beta arbitrary code execution vulnerability",
+                    "refsource": "MLIST",
+                    "url": "http://www.openwall.com/lists/oss-security/2015/05/19/13"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+          "assignerShortName": "mitre",
+          "cveId": "CVE-2015-4035",
+          "datePublished": "2017-07-25T18:00:00.000Z",
+          "dateReserved": "2015-05-19T00:00:00.000Z",
+          "dateUpdated": "2024-08-06T06:04:02.701Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.1"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2015/4xxx/CVE-2015-4035.json",
+      "english_descriptions": [
+        "scripts/xzgrep.in in xzgrep 5.2.x before 5.2.0, before 5.0.0 does not properly process file names containing semicolons, which allows remote attackers to execute arbitrary code by having a user run xzgrep on a crafted file name."
+      ],
+      "evidence_url": "https://security-tracker.debian.org/tracker/source-package/xz-utils",
+      "reference_urls": [
+        "http://seclists.org/oss-sec/2015/q2/484",
+        "https://bugzilla.redhat.com/show_bug.cgi?id=1223341",
+        "https://git.tukaani.org/?p=xz.git%3Ba=commitdiff%3Bh=f4b2b52624b802c786e4e2a8eb6895794dd93b24",
+        "http://www.openwall.com/lists/oss-security/2015/05/19/13"
+      ],
+      "why_excluded": "Affects scripts/xzgrep.in, not the liblzma library."
+    },
+    {
+      "affects_liblzma": false,
+      "cve_id": "CVE-2020-22916",
+      "cve_record": {
+        "containers": {
+          "adp": [
+            {
+              "metrics": [
+                {
+                  "cvssV3_1": {
+                    "attackComplexity": "LOW",
+                    "attackVector": "LOCAL",
+                    "availabilityImpact": "HIGH",
+                    "baseScore": 5.5,
+                    "baseSeverity": "MEDIUM",
+                    "confidentialityImpact": "NONE",
+                    "integrityImpact": "NONE",
+                    "privilegesRequired": "NONE",
+                    "scope": "UNCHANGED",
+                    "userInteraction": "REQUIRED",
+                    "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
+                    "version": "3.1"
+                  }
+                },
+                {
+                  "other": {
+                    "content": {
+                      "id": "CVE-2020-22916",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "no"
+                        },
+                        {
+                          "Technical Impact": "partial"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "timestamp": "2024-07-18T15:53:39.716725Z",
+                      "version": "2.0.3"
+                    },
+                    "type": "ssvc"
+                  }
+                }
+              ],
+              "problemTypes": [
+                {
+                  "descriptions": [
+                    {
+                      "description": "CWE-noinfo Not enough information",
+                      "lang": "en",
+                      "type": "CWE"
+                    }
+                  ]
+                }
+              ],
+              "providerMetadata": {
+                "dateUpdated": "2024-10-29T13:27:25.557Z",
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP"
+              },
+              "title": "CISA ADP Vulnrichment"
+            },
+            {
+              "providerMetadata": {
+                "dateUpdated": "2024-08-04T14:51:10.789Z",
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE"
+              },
+              "references": [
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://tukaani.org/xz/"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://github.com/tukaani-project/xz/issues/61"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://security-tracker.debian.org/tracker/CVE-2020-22916"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2234987"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "https://bugzilla.suse.com/show_bug.cgi?id=1214590"
+                },
+                {
+                  "tags": [
+                    "x_transferred"
+                  ],
+                  "url": "http://web.archive.org/web/20230918084612/https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability"
+                }
+              ],
+              "title": "CVE Program Container"
+            }
+          ],
+          "cna": {
+            "affected": [
+              {
+                "product": "n/a",
+                "vendor": "n/a",
+                "versions": [
+                  {
+                    "status": "affected",
+                    "version": "n/a"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "An issue discovered in XZ 5.2.5 allows attackers to cause a denial of service via decompression of a crafted file. NOTE: the vendor disputes the claims of \"endless output\" and \"denial of service\" because decompression of the 17,486 bytes always results in 114,881,179 bytes, which is often a reasonable size increase."
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "description": "n/a",
+                    "lang": "en",
+                    "type": "text"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "dateUpdated": "2023-09-18T08:58:12.470Z",
+              "orgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+              "shortName": "mitre"
+            },
+            "references": [
+              {
+                "url": "https://tukaani.org/xz/"
+              },
+              {
+                "url": "https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability"
+              },
+              {
+                "url": "https://github.com/tukaani-project/xz/issues/61"
+              },
+              {
+                "url": "https://security-tracker.debian.org/tracker/CVE-2020-22916"
+              },
+              {
+                "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2234987"
+              },
+              {
+                "url": "https://bugzilla.suse.com/show_bug.cgi?id=1214590"
+              },
+              {
+                "url": "http://web.archive.org/web/20230918084612/https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability"
+              }
+            ],
+            "tags": [
+              "disputed"
+            ]
+          }
+        },
+        "cveMetadata": {
+          "assignerOrgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+          "assignerShortName": "mitre",
+          "cveId": "CVE-2020-22916",
+          "datePublished": "2023-08-22T00:00:00.000Z",
+          "dateReserved": "2020-08-13T00:00:00.000Z",
+          "dateUpdated": "2024-10-29T13:27:25.557Z",
+          "state": "PUBLISHED"
+        },
+        "dataType": "CVE_RECORD",
+        "dataVersion": "5.1"
+      },
+      "cve_record_url": "https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/2020/22xxx/CVE-2020-22916.json",
+      "english_descriptions": [
+        "An issue discovered in XZ 5.2.5 allows attackers to cause a denial of service via decompression of a crafted file. NOTE: the vendor disputes the claims of \"endless output\" and \"denial of service\" because decompression of the 17,486 bytes always results in 114,881,179 bytes, which is often a reasonable size increase."
+      ],
+      "evidence_url": "https://tukaani.org/xz/",
+      "reference_urls": [
+        "https://tukaani.org/xz/",
+        "https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability",
+        "https://github.com/tukaani-project/xz/issues/61",
+        "https://security-tracker.debian.org/tracker/CVE-2020-22916",
+        "https://bugzilla.redhat.com/show_bug.cgi?id=2234987",
+        "https://bugzilla.suse.com/show_bug.cgi?id=1214590",
+        "http://web.archive.org/web/20230918084612/https://github.com/snappyJack/CVE-request-XZ-5.2.5-has-denial-of-service-vulnerability"
+      ],
+      "why_excluded": "The official XZ site states this CVE is bogus and not a security issue or bug."
+    }
+  ],
+  "selection_criteria": "Included when the official XZ security page and/or the CVE CNA record indicates that the issue affects liblzma itself or liblzma APIs. Excluded when the issue is limited to XZ command-line tools, xzgrep scripts, or is explicitly documented as bogus/non-applicable to liblzma.",
+  "snapshot_date": "2026-04-05",
+  "source_snapshots": {
+    "debian_xz_utils_tracker_text": "\n\n                     Information on source package xz-utils\n\n     * xz-utils in the Package Tracking System\n     * xz-utils in the Bug Tracking System\n     * xz-utils source code\n     * xz-utils in the testing migration checker\n\nAvailable versions\n\n   Release       Version\n   bullseye 5.2.5-2.1~deb11u1\n   bookworm 5.4.1-1\n   trixie   5.8.1-1\n   forky    5.8.2-2\n   sid      5.8.2-2\n\nOpen issues\n\n   Bug bullseye bookworm trixie forky sid Description\n   CVE-2026-34743 vulnerable (no DSA, postponed) vulnerable (no DSA)\n   vulnerable (no DSA) vulnerable vulnerable XZ Utils provide a\n   general-purpose data-compression library plus comma ...\n\nResolved issues\n\n   Bug Description\n   CVE-2025-31115 XZ Utils provide a general-purpose data-compression\n   library plus comma ...\n   CVE-2024-47611 XZ Utils provide a general-purpose data-compression\n   library plus comma ...\n   CVE-2024-3094 Malicious code was discovered in the upstream tarballs of\n   xz, starting ...\n   CVE-2022-1271 An arbitrary file write vulnerability was found in GNU\n   gzip's zgrep ut ...\n   CVE-2015-4035 scripts/xzgrep.in in xzgrep 5.2.x before 5.2.0, before\n   5.0.0 does not ...\n\nSecurity announcements\n\n   DSA / DLA         Description\n   DSA-5895-1 xz-utils - security update\n   DSA-5123-1 xz-utils - security update\n   DLA-2977-1 xz-utils - security update\n     __________________________________________________________________\n\n   Search for package or bug name: ____________________ Go Reporting\n   problems\n\n   Home - Debian Security - Source (Git)",
+    "debian_xz_utils_tracker_url": "https://security-tracker.debian.org/tracker/source-package/xz-utils",
+    "xz_utils_security_page_text": "   tukaani.org \u00bb XZ Utils\n     __________________________________________________________________\n\nXZ Utils\n\n   Table of Contents\n     * Introduction\n     * Documentation\n     * Security issues\n          + CVE-2026-34743: Buffer overflow in lzma_index_append()\n          + CVE-2025-31115: Threaded .xz decoder frees memory too early\n          + CVE-2024-47611: Argument injection on Windows\n          + CVE-2024-3094: liblzma backdoor\n          + CVE-2022-1271: xzgrep filename handling\n          + CVE-2020-22916: A bogus CVE\n     * Source packages\n          + Stable\n          + Old releases\n     * Development\n          + Building from xz.git\n               o Minimum Autotools and CMake versions\n               o Optional dependencies\n          + Future build system plans\n     * Bindings\n     * Binary packages\n          + Windows\n     * Supported platforms\n     * Licensing\n     * Reporting bugs\n\nIntroduction\n\n   XZ Utils are a complete C99 implementation of the .xz file format. XZ\n   Utils were originally written for POSIX systems but have been ported to\n   a few non-POSIX systems as well.\n\n   The core of the XZ Utils compression code is based on LZMA SDK but it\n   has been modified significantly to be suitable for XZ Utils.\n\n   XZ Utils consist of several components:\n     * liblzma is a compression library with an API similar to that of\n       zlib.\n     * xz is a command line tool with syntax similar to that of gzip.\n     * xzdec is a decompression-only tool smaller than the full-featured\n       xz tool.\n     * A set of shell scripts (xzgrep, xzdiff, etc.) have been adapted\n       from gzip to ease viewing, grepping, and comparing compressed\n       files.\n\nDocumentation\n\n   Man pages with keyword indexes:\n     * xz(1)\n     * xzgrep(1)\n     * xzdiff(1) and xzcmp(1)\n     * xzless(1)\n     * xzmore(1)\n     * xzdec(1)\n     * lzmainfo(1)\n\n   liblzma API documentation was generated using Doxygen.\n\nSecurity issues\n\nCVE-2026-34743: Buffer overflow in lzma_index_append()\n\n   In XZ Utils 5.8.2 and older, a buffer overflow can occur in\n   lzma_index_append() under conditions that likely don\u2019t exist in any\n   real-world application.\n\n   The bug was reported and discovered by Cantina using their AppSec\n   agent, Apex.\n\nCVE-2025-31115: Threaded .xz decoder frees memory too early\n\n   In XZ Utils 5.3.3alpha to 5.8.0, the multithreaded .xz decoder in\n   liblzma has a bug where invalid input can at least result in a crash.\n\n   Thanks to Harri K. Koskinen for discovering and reporting this issue.\n\nCVE-2024-47611: Argument injection on Windows\n\n   When built for native Windows (mingw-w64 or MSVC), the command line\n   tools from XZ Utils 5.6.2 and older have a command line argument\n   injection vulnerability. Command line tools built for Cygwin or MSYS2\n   are unaffected. liblzma is unaffected.\n\n   This issue was discovered by Orange Tsai and splitline from DEVCORE\n   Research Team.\n\nCVE-2024-3094: liblzma backdoor\n\n   XZ Utils 5.6.0 (2024-02-24) and 5.6.1 (2024-03-09) release tarballs\n   contain a backdoor that was inserted by a malicious co-maintainer. It\n   was discovered by Andres Freund and made public on 2024-03-29. The\n   incident is known as CVE-2024-3094.\n\n   This is still being investigated. See the XZ Utils backdoor page for\n   more information and also the XZ Utils review notes.\n\nCVE-2022-1271: xzgrep filename handling\n\n   CVE-2022-1271 is also known as ZDI-CAN-16587.\n\n   Malicious filenames can make xzgrep to write to arbitrary files or\n   (with a GNU sed extension) lead to arbitrary code execution. A patch to\n   fix it was made public on 2022-04-07. The patch applies to 4.999.9beta,\n   5.0.0 to 5.2.5, 5.3.1alpha, and 5.3.2alpha. Newer XZ Utils releases\n   include an improved fix for the problem.\n\n   xzgrep-ZDI-CAN-16587.patch \u2014 signature\n\n   The vulnerability was discovered by cleemy desu wayo working with Trend\n   Micro Zero Day Initiative.\n\nCVE-2020-22916: A bogus CVE\n\n   CVE-2020-22916 is bogus; it\u2019s not a security issue or a bug.\n\n   The report had a corrupt .lzma file which uses a tiny 256-byte\n   dictionary. So decompression needs very little memory. The reporter\n   claimed that decompressing it \u201ccould cause endless output\u201d.\n\n   Both XZ Utils and the long-deprecated LZMA Utils produce 114,881,179\n   bytes of output from the file before reporting an error. This is not\n   \u201cendless output\u201d. The decompression speed is good too.\n\nSource packages\n\n   See the NEWS file for a summary of changes between versions.\n\n   The releases have been signed with Lasse Collin\u2019s OpenPGP key.\n\nStable\n\n   XZ Utils 5.8.3 fix a minor security issue that affects all stable XZ\n   Utils releases. See the security advisory for details.\n\n   CAPTION: 5.8.3 (2026-03-31)\n\n   xz-5.8.3.tar.gz\n\n   2707 KiB\n\n   signature\n\n   xz-5.8.3.tar.bz2\n\n   1982 KiB\n\n   signature\n\n   xz-5.8.3.tar.xz\n\n   1512 KiB\n\n   signature\n\n   xz-5.8.3.tar\n\n   signature\n\n   XZ Utils source packages are also available on Codeberg and\n   Sourceforge.\n\n   It is fine to build packages from the Git repository instead of using\n   the release tarballs. Use either a tag that matches a release (v5.x.x)\n   or the latest commit of a stable branch (v5.x). See the Development\n   section below.\n\nOld releases\n\n   Source and binary packages of the old XZ Utils releases are available\n   on a separate page.\n\nDevelopment\n\n   The primary Git repository is on GitHub:\ngit clone https://github.com/tukaani-project/xz\n\n   The repository is mirrored (with some delay) to Codeberg and\n   git.tukaani.org as well.\n\n   The master branch contains the latest development code.\n\n   Maintenance status of the stable branches:\n     * v5.8: maintained\n     * v5.6: critical fixes only (no new releases)\n     * v5.4: critical fixes only (no new releases)\n     * v5.2: unmaintained\n     * v5.0: unmaintained\n\n   The other branches on GitHub are temporary development branches which\n   also see force pushes. These branches aren\u2019t mirrored to\n   git.tukaani.org.\n\nBuilding from xz.git\n\n   Two multi-platform build systems are supported:\n     * The GNU Autotools-based build is old, feature complete, and the\n       most tested. Apart from Windows, DOS, and OpenVMS, the\n       Autotools-based build is the most likely to work on less common or\n       old platforms. Run ./autogen.sh to generate the configure script\n       and other files.\n     * CMake-based build became feature complete in June 2024. However, it\n       hasn\u2019t received as much testing as the Autotools-based build. See\n       the notes at the top of CMakeLists.txt.\n\n   Special cases: OpenVMS and DOS builds use different build systems. See\n   the file INSTALL.\n\nMinimum Autotools and CMake versions\n\n   For GNU Autotools, it is recommended to use the latest versions. The\n   minimum versions required are old though:\n     * Autoconf 2.69\n     * Automake 1.12\n     * gettext 0.19.6\n     * Libtool 2.4\n\n   For the CMake build, version 3.20 or greater is required. Translation\n   support also requires that GNU gettext-tools are installed.\n\nOptional dependencies\n\n   po4a is needed for translated documentation (man pages).\n     * Autotools: To build without po4a, pass --no-po4a as the argument to\n       autogen.sh.\n     * CMake: Run the shell script po4a/update-po to generate the\n       translated man pages inside the source tree (thus the source tree\n       will have extra files; it won\u2019t stay completely clean). If the\n       translated man pages exist in the source tree, make install will\n       install them if translation support was enabled (XZ_NLS).\n\n   Doxygen can be used to generate liblzma API documentation in HTML\n   format which make install will also install. Doxygen usage is disabled\n   by default.\n     * Autotools: Pass --enable-doxygen as an argument to configure.\n     * CMake: Pass -DXZ_DOXYGEN=ON as an argument to cmake.\n\nFuture build system plans\n\n   People have wished for Meson support and work on it has been started.\n\n   While dropping Autotools is tempting, there are use cases where\n   Autotools have benefits still:\n     * Easier bootstrapping on modern operating systems. muon might make\n       this easier with Meson-based build though.\n     * Better support for old or obscure operating systems. As time goes\n       on, these get less and less important though.\n\nBindings\n\n     * Python\n     * Perl: IO-Compress-Lzma and Compress-Raw-Lzma\n     * Haskell\n     * Delphi and Free Pascal\n\nBinary packages\n\n   Many free software operating systems already provide easy-to-install XZ\n   Utils binaries. It doesn\u2019t make sense to provide links to all those\n   here.\n\nWindows\n\n   The 5.8.3 binaries have been built with GCC 15.2.0 and mingw-w64 13.0.0\n   against UCRT. They should work on Windows 10 and later. They might work\n   on older Windows versions if UCRT has been installed.\n\n   It\u2019s unknown if new binary releases will be made in the future.\n\n   CAPTION: 5.8.3 (2026-03-31)\n\n   xz-5.8.3-windows.zip\n\n   1066 KiB\n\n   signature\n\n   xz-5.8.3-windows.7z\n\n   654 KiB\n\n   signature\n\nSupported platforms\n\n   Below is an incomplete and somewhat vague (version numbers mostly\n   missing) list of operating systems on which XZ Utils should work.\n   Compiler(s) or toolchains are mentioned in parenthesis. GCC refers to\n   GCC 3 or later. If Clang/LLVM is available for the operating system\n   then it should work too. Additions and corrections are welcome.\n     * GNU/Linux (GCC, Clang, ICC, ICX, XL C)\n     * GNU/Hurd (GCC)\n     * DragonflyBSD\n     * FreeBSD\n     * MirBSD\n     * NetBSD\n     * OpenBSD\n     * MINIX 3.3.0 and later ^[1]\n     * Haiku\n     * SerenityOS\n     * AROS and AmigaOS\n     * macOS / Mac OS X / Darwin\n     * Solaris 10, 11 (GCC, Sun Studio / Oracle Developer Studio) ^[1]\n     * AIX (GCC, XL C) ^[1]\n     * z/OS UNIX System Services (XL C) ^[1]\n     * QNX\n     * HP-UX (GCC, HP ANSI C) ^[2]\n     * OpenVMS (HP C compiler) ^[1]\n     * OpenVOS 17 (GCC)\n     * Windows 2000 and later (GCC or Clang/LLVM with mingw-w64,\n       GCC/Cygwin, Visual Studio 2015 or later) ^[1]\n     * DOS e.g. FreeDOS and MS-DOS (GCC/DJGPP) ^[1]\n\n   XZ Utils have or had support for the following operating systems but\n   recent releases might not work anymore. If the latest XZ Utils don\u2019t\n   work, try XZ Utils 5.4.7 or an even older release. Support for obsolete\n   operating systems and versions might be retained or restored if it is\n   easy to do.\n     * Solaris 9 and older ^[3]\n     * IRIX (MIPSpro) ^[1]\n     * Tru64 (GCC, Compaq C compiler) ^[4]\n     * SCO OpenServer 5 (GCC 3.4.6, 4.2.4) ^[5]\n     * Windows 95/98/98SE/ME, NT4, Interix (pre-W2k support was disabled\n       after XZ Utils 5.4.x)\n     * OS/2, eComStation (GCC)\n\nLicensing\n\n   From the version 5.5.2beta onwards, the core components of XZ Utils are\n   under the BSD Zero Clause License (0BSD). The earlier versions that\n   were released as public domain obviously remain in the public domain.\n\n   Some parts of XZ Utils (for example, scripts from GNU gzip and some\n   build system files) are under different free software licenses such as\n   GNU LGPLv2.1, GNU GPLv2, or GNU GPLv3.\n\n   See the file COPYING for more details.\n\nReporting bugs\n\n   Bugs can be reported on GitHub or via email or IRC. If a security issue\n   has been discovered, please report it privately via email (encrypted if\n   possible) or use the Report a vulnerability button in the security\n   section on GitHub.\n\n   Bugs in translations should be reported to the appropriate translation\n   team. See the Language-Team and Last-Translator fields in the PO file\n   header. A few translations include the bug reporting address at the\n   bottom of xz --help too. See also the xz (command line tools) and\n   xz-man (man pages) domains in the Translation Project.\n     __________________________________________________________________\n\n   1. See also the platform-specific notes in the INSTALL file.\n   2. 2010-09-22: It was reported that HP ANSI C compiler crashes when\n   compiling XZ Utils on PA-RISC. On Itanium there were no problems.\n   3. On Solaris 8 and 9 one may need to pass ac_cv_prog_cc_c99= to\n   configure if using Sun Studio.\n   4. With the native compiler CC=cc one may need to pass\n   ac_cv_prog_cc_c99= to configure.\n   5. On SCO OpenServer 5, use --disable-threads when running configure.\n     __________________________________________________________________\n\n   tukaani.org \u00bb XZ Utils",
+    "xz_utils_security_page_url": "https://tukaani.org/xz/"
+  }
+}
