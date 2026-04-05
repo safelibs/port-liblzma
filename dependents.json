@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "library": "liblzma",
+  "distribution": "Ubuntu 24.04 LTS (noble)",
+  "collection_date_local": "2026-04-05",
+  "generated_at_utc": "2026-04-05T18:30:33Z",
+  "metadata_source": "local apt-cache binary and source package metadata, installed man pages, installed package file lists, installed headers, and installed binary/library strings from an Ubuntu 24.04 system configured against the Ubuntu 24.04 repositories",
+  "selection_scope": {
+    "goal": "Curate a diverse, non-exhaustive set of Ubuntu 24.04 repository packages whose build or runtime behavior depends on liblzma.",
+    "selection_policy": [
+      "Prefer packages with a direct runtime dependency on liblzma5 and a direct source-package Build-Depends on liblzma-dev when both are easy to verify.",
+      "Allow indirect runtime paths when the user-facing package clearly routes liblzma-backed behavior through a dependent library package, as with apt and python3.12.",
+      "Prefer packages from different domains: package management, language runtimes, XML and image libraries, archive handling, filesystem tooling, kernel module management, debugging, databases, and C++ runtime libraries.",
+      "Describe the runtime behavior that actually exercises liblzma instead of only restating that the package depends on it."
+    ],
+    "notes": [
+      "This file is intentionally representative rather than exhaustive.",
+      "Every listed package has concrete runtime functionality that relies on liblzma; compile-time dependence is included when it was directly verified from Ubuntu source metadata."
+    ]
+  },
+  "dependents": [
+    {
+      "binary_package": "dpkg",
+      "source_package": "dpkg",
+      "category": "package manager",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "dpkg",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Handles xz-compressed members inside .deb archives during package extraction and installation, including archives that use xz for control.tar and data.tar members.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: dpkg Pre-Depends on liblzma5.",
+        "Ubuntu source metadata: dpkg Build-Depends on liblzma-dev.",
+        "The installed deb(5) man page says .deb members may be compressed with xz and names xz support for control.tar and data.tar.",
+        "The installed dpkg-deb binary links liblzma and its strings mention xz as an allowed compression type."
+      ]
+    },
+    {
+      "binary_package": "apt",
+      "source_package": "apt",
+      "category": "package manager",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "indirect",
+      "runtime_dependency_path": [
+        "apt",
+        "libapt-pkg6.0t64",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Downloads and decompresses xz or lzma-compressed repository metadata and also handles Debian package members such as control.tar.xz, data.tar.xz, and data.tar.lzma through libapt-pkg.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: apt depends on libapt-pkg6.0t64, and libapt-pkg6.0t64 depends on liblzma5.",
+        "Ubuntu source metadata: apt Build-Depends on liblzma-dev.",
+        "The shipped file /usr/share/doc/apt/examples/configure-index declares Acquire::CompressionTypes entries for lzma and xz.",
+        "The installed libapt-pkg library links liblzma and its strings mention Acquire::CompressionTypes::xz, Acquire::CompressionTypes::lzma, control.tar.xz, data.tar.xz, and data.tar.lzma."
+      ]
+    },
+    {
+      "binary_package": "python3.12",
+      "source_package": "python3.12",
+      "category": "programming language runtime",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "indirect",
+      "runtime_dependency_path": [
+        "python3.12",
+        "libpython3.12-stdlib",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Provides Python's lzma module so Python code can read and write .xz and raw .lzma streams through APIs such as lzma.open(), LZMAFile, compress(), and decompress().",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: python3.12 depends on libpython3.12-stdlib, and libpython3.12-stdlib depends on liblzma5.",
+        "Ubuntu source metadata: python3.12 Build-Depends on liblzma-dev.",
+        "The installed libpython3.12-stdlib package ships /usr/lib/python3.12/lzma.py and /usr/lib/python3.12/lib-dynload/_lzma.cpython-312-x86_64-linux-gnu.so.",
+        "A local runtime check with python3.12 successfully imports the lzma module."
+      ]
+    },
+    {
+      "binary_package": "libxml2",
+      "source_package": "libxml2",
+      "category": "XML parser library",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "libxml2",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Lets libxml2 callers transparently read xz-compressed XML input through the library's I/O layer.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: libxml2 depends on liblzma5.",
+        "Ubuntu source metadata: libxml2 Build-Depends-Arch on liblzma-dev.",
+        "The installed libxml2 README documents the LIBXML2_WITH_LZMA build option and names liblzma as a supported compression library.",
+        "The installed libxml2 shared library links liblzma and exposes xz-related symbols such as __libxml2_xzopen, __libxml2_xzread, and __libxml2_xzcompressed."
+      ]
+    },
+    {
+      "binary_package": "libtiff6",
+      "source_package": "tiff",
+      "category": "image codec library",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "libtiff6",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Reads and writes TIFF images that use the LZMA compression scheme.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: libtiff6 depends on liblzma5.",
+        "Ubuntu source metadata: tiff Build-Depends on liblzma-dev.",
+        "The installed libtiff shared library contains LZMA-specific symbols and strings including TIFFInitLZMA, tif_lzma.c, COMPRESSION_LZMA, and LZMA2 Compression Preset."
+      ]
+    },
+    {
+      "binary_package": "squashfs-tools",
+      "source_package": "squashfs-tools",
+      "category": "filesystem image tool",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "squashfs-tools",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "The mksquashfs and unsquashfs tools can create and extract SquashFS images that use xz or lzma compression.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: squashfs-tools depends on liblzma5.",
+        "Ubuntu source metadata: squashfs-tools Build-Depends on liblzma-dev.",
+        "The installed mksquashfs and unsquashfs binaries link liblzma.",
+        "The installed mksquashfs man page lists xz and lzma among the supported compressors and documents xz and lzma compressor options."
+      ]
+    },
+    {
+      "binary_package": "kmod",
+      "source_package": "kmod",
+      "category": "kernel module manager",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "kmod",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Loads and inspects compressed kernel modules, including .ko.xz modules, through libkmod's xz decompression path.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: kmod depends on liblzma5.",
+        "Ubuntu source metadata: kmod Build-Depends on liblzma-dev.",
+        "The installed kmod binary strings include .ko.xz, load_xz, xz_uncompress_belch, and multiple xz-specific error messages."
+      ]
+    },
+    {
+      "binary_package": "gdb",
+      "source_package": "gdb",
+      "category": "debugger",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "gdb",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Uses liblzma when consuming LZMA-compressed .gnu_debugdata mini-debuginfo sections embedded in ELF binaries.",
+      "runtime_evidence_level": "strongly_inferred",
+      "evidence": [
+        "Ubuntu package metadata: gdb depends on liblzma5.",
+        "Ubuntu source metadata: gdb Build-Depends on liblzma-dev.",
+        "The installed gdb binary links liblzma.",
+        "The installed gdb binary contains .gnu_debugdata strings including '.gnu_debugdata for %s' and 'Cannot parse .gnu_debugdata section; not a BFD object'."
+      ]
+    },
+    {
+      "binary_package": "libarchive13t64",
+      "source_package": "libarchive",
+      "category": "archive library",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "libarchive13t64",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Reads and writes xz and lzma-compressed archive streams for libarchive-based tools and applications.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: libarchive13t64 depends on liblzma5.",
+        "Ubuntu source metadata: libarchive Build-Depends on liblzma-dev.",
+        "The Ubuntu package description explicitly says the library supports xz and lzma filters using liblzma.",
+        "The installed archive.h header declares archive_read_support_filter_xz(), archive_read_support_filter_lzma(), archive_write_add_filter_xz(), and archive_write_add_filter_lzma()."
+      ]
+    },
+    {
+      "binary_package": "mariadb-plugin-provider-lzma",
+      "source_package": "mariadb",
+      "category": "database compression plugin",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "mariadb-plugin-provider-lzma",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Adds LZMA compression support for MariaDB server storage-engine paths, with the package description calling out InnoDB and Mroonga specifically.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: mariadb-plugin-provider-lzma depends on liblzma5.",
+        "Ubuntu source metadata: mariadb Build-Depends on liblzma-dev.",
+        "The Ubuntu package description explicitly says the plugin provides LZMA compression support in the server and storage engines and notes that it affects InnoDB and Mroonga."
+      ]
+    },
+    {
+      "binary_package": "libboost-iostreams1.83.0",
+      "source_package": "boost1.83",
+      "category": "C++ runtime library",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "direct",
+      "runtime_dependency_path": [
+        "libboost-iostreams1.83.0",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Exposes Boost.Iostreams LZMA compressor and decompressor filters to C++ programs that build pipelines around Boost stream abstractions.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: libboost-iostreams1.83.0 depends on liblzma5.",
+        "Ubuntu source metadata: boost1.83 Build-Depends on liblzma-dev.",
+        "The installed header /usr/include/boost/iostreams/filter/lzma.hpp defines lzma_compressor and lzma_decompressor filter types."
+      ]
+    }
+  ]
+}
