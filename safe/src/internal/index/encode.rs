@@ -31,17 +31,18 @@ fn encode_index_bytes(index: &Index) -> Vec<u8> {
     out.push(INDEX_INDICATOR);
     push_vli(&mut out, index.record_count);
 
-    for stream in &index.streams {
-        for (record_index, record) in stream.records.iter().enumerate() {
+    for stream in index.streams() {
+        let records = stream.records();
+        for (record_index, record) in records.iter().enumerate() {
             let prev_unpadded = if record_index == 0 {
                 0
             } else {
-                vli_ceil4(stream.records[record_index - 1].unpadded_sum)
+                vli_ceil4(records[record_index - 1].unpadded_sum)
             };
             let prev_uncompressed = if record_index == 0 {
                 0
             } else {
-                stream.records[record_index - 1].uncompressed_sum
+                records[record_index - 1].uncompressed_sum
             };
 
             push_vli(&mut out, record.unpadded_sum - prev_unpadded);
@@ -186,17 +187,26 @@ mod tests {
     #[test]
     fn encoder_handles_nonempty_records() {
         let mut index = Index::new();
-        index.streams[0].records = vec![
-            IndexRecord {
-                uncompressed_sum: 1,
-                unpadded_sum: 5,
-            },
-            IndexRecord {
-                uncompressed_sum: 10,
-                unpadded_sum: 14,
-            },
-        ];
-        index.streams[0].index_list_size = 4;
+        unsafe {
+            let stream = index.last_stream_mut();
+            assert!(stream.push_record(
+                IndexRecord {
+                    uncompressed_sum: 1,
+                    unpadded_sum: 5,
+                },
+                2,
+                ptr::null(),
+            ));
+            assert!(stream.push_record(
+                IndexRecord {
+                    uncompressed_sum: 10,
+                    unpadded_sum: 14,
+                },
+                0,
+                ptr::null(),
+            ));
+            stream.index_list_size = 4;
+        }
         index.record_count = 2;
         index.index_list_size = 4;
         index.uncompressed_size = 10;

@@ -77,16 +77,17 @@ fn fill_stream_info(out: &mut lzma_index_iter_stream, stream: &IndexStream) {
 }
 
 fn fill_block_info(out: &mut lzma_index_iter_block, stream: &IndexStream, record_index: usize) {
-    let record = stream.records[record_index];
+    let records = stream.records();
+    let record = records[record_index];
     let prev_uncompressed = if record_index == 0 {
         0
     } else {
-        stream.records[record_index - 1].uncompressed_sum
+        records[record_index - 1].uncompressed_sum
     };
     let prev_unpadded = if record_index == 0 {
         0
     } else {
-        vli_ceil4(stream.records[record_index - 1].unpadded_sum)
+        vli_ceil4(records[record_index - 1].unpadded_sum)
     };
 
     out.number_in_stream = record_index as lzma_vli + 1;
@@ -113,27 +114,28 @@ fn clear_block_info(out: &mut lzma_index_iter_block) {
 }
 
 fn has_nonempty_block(stream: &IndexStream, record_index: usize) -> bool {
-    let current = stream.records[record_index].uncompressed_sum;
+    let records = stream.records();
+    let current = records[record_index].uncompressed_sum;
     let previous = if record_index == 0 {
         0
     } else {
-        stream.records[record_index - 1].uncompressed_sum
+        records[record_index - 1].uncompressed_sum
     };
     current > previous
 }
 
 fn first_nonempty_stream(index: &Index, start: usize) -> Option<usize> {
     index
-        .streams
+        .streams()
         .iter()
         .enumerate()
         .skip(start)
-        .find(|(_, stream)| !stream.records.is_empty())
+        .find(|(_, stream)| !stream.records().is_empty())
         .map(|(pos, _)| pos)
 }
 
 fn next_stream_position(index: &Index, start: usize) -> Option<usize> {
-    if start < index.streams.len() {
+    if start < index.stream_count() {
         Some(start)
     } else {
         None
@@ -150,7 +152,7 @@ fn candidate_next(
         LZMA_INDEX_ITER_STREAM => {
             let stream = current_stream.map_or(0, |pos| pos + 1);
             let stream = next_stream_position(index, stream)?;
-            let record = if index.streams[stream].records.is_empty() {
+            let record = if index.streams()[stream].records().is_empty() {
                 None
             } else {
                 Some(0)
@@ -166,7 +168,7 @@ fn candidate_next(
                     stream = first_nonempty_stream(index, 0)?;
                     record = 0;
                 } else {
-                    let records = &index.streams[stream].records;
+                    let records = index.streams()[stream].records();
                     if !records.is_empty() && record + 1 < records.len() {
                         record += 1;
                     } else {
@@ -175,24 +177,22 @@ fn candidate_next(
                     }
                 }
 
-                if mode == LZMA_INDEX_ITER_BLOCK
-                    || has_nonempty_block(&index.streams[stream], record)
-                {
+                if mode == LZMA_INDEX_ITER_BLOCK || has_nonempty_block(&index.streams()[stream], record) {
                     return Some((stream, Some(record)));
                 }
             }
         }
         LZMA_INDEX_ITER_ANY => {
             if let Some(stream) = current_stream {
-                let current = &index.streams[stream];
+                let current = &index.streams()[stream];
                 if let Some(record) = current_record {
-                    if record + 1 < current.records.len() {
+                    if record + 1 < current.records().len() {
                         return Some((stream, Some(record + 1)));
                     }
                 }
 
                 let next_stream = next_stream_position(index, stream + 1)?;
-                let next_record = if index.streams[next_stream].records.is_empty() {
+                let next_record = if index.streams()[next_stream].records().is_empty() {
                     None
                 } else {
                     Some(0)
@@ -200,7 +200,7 @@ fn candidate_next(
                 Some((next_stream, next_record))
             } else {
                 let stream = next_stream_position(index, 0)?;
-                let record = if index.streams[stream].records.is_empty() {
+                let record = if index.streams()[stream].records().is_empty() {
                     None
                 } else {
                     Some(0)
@@ -256,7 +256,7 @@ pub(crate) unsafe fn index_iter_next(
         return 1;
     };
 
-    let stream = &index.streams[next_stream];
+    let stream = &index.streams()[next_stream];
     fill_stream_info(&mut (*iter).stream, stream);
     if let Some(record) = next_record {
         fill_block_info(&mut (*iter).block, stream, record);
@@ -283,20 +283,20 @@ pub(crate) unsafe fn index_iter_locate(iter: *mut lzma_index_iter, target: lzma_
     }
 
     let stream_pos = match index
-        .streams
+        .streams()
         .partition_point(|stream| stream.uncompressed_base <= target)
         .checked_sub(1)
     {
         Some(pos) => pos,
         None => return 1,
     };
-    let stream = &index.streams[stream_pos];
+    let stream = &index.streams()[stream_pos];
     let target_in_stream = target - stream.uncompressed_base;
 
     let record_pos = stream
-        .records
+        .records()
         .partition_point(|record| record.uncompressed_sum <= target_in_stream);
-    if record_pos >= stream.records.len() {
+    if record_pos >= stream.records().len() {
         return 1;
     }
 
@@ -313,39 +313,53 @@ mod tests {
     use crate::internal::index::core::{Index, IndexRecord, IndexStream};
 
     fn sample_index() -> Index {
-        let mut first = IndexStream::new(0, 0, 1, 0);
-        first.records = vec![
-            IndexRecord {
-                uncompressed_sum: 0,
-                unpadded_sum: 16,
-            },
-            IndexRecord {
-                uncompressed_sum: 5,
-                unpadded_sum: 48,
-            },
-            IndexRecord {
-                uncompressed_sum: 16,
-                unpadded_sum: 88,
-            },
-        ];
-        first.index_list_size = 6;
+        let mut index = Index::new();
+        unsafe {
+            let first = index.last_stream_mut();
+            assert!(first.push_record(
+                IndexRecord {
+                    uncompressed_sum: 0,
+                    unpadded_sum: 16,
+                },
+                3,
+                ptr::null(),
+            ));
+            assert!(first.push_record(
+                IndexRecord {
+                    uncompressed_sum: 5,
+                    unpadded_sum: 48,
+                },
+                0,
+                ptr::null(),
+            ));
+            assert!(first.push_record(
+                IndexRecord {
+                    uncompressed_sum: 16,
+                    unpadded_sum: 88,
+                },
+                0,
+                ptr::null(),
+            ));
+            first.index_list_size = 6;
 
-        let mut second = IndexStream::new(120, 16, 2, 3);
-        second.records = vec![IndexRecord {
-            uncompressed_sum: 7,
-            unpadded_sum: 24,
-        }];
-        second.index_list_size = 2;
-
-        Index {
-            streams: vec![first, second],
-            uncompressed_size: 23,
-            total_size: 112,
-            record_count: 4,
-            index_list_size: 8,
-            prealloc: 512,
-            checks: 0,
+            let mut second = IndexStream::new(120, 16, 2, 3);
+            assert!(second.push_record(
+                IndexRecord {
+                    uncompressed_sum: 7,
+                    unpadded_sum: 24,
+                },
+                1,
+                ptr::null(),
+            ));
+            second.index_list_size = 2;
+            assert!(index.push_stream(second, ptr::null()));
         }
+
+        index.uncompressed_size = 23;
+        index.total_size = 112;
+        index.record_count = 4;
+        index.index_list_size = 8;
+        index
     }
 
     #[test]

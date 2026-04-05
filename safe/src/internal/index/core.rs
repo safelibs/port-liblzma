@@ -1,10 +1,11 @@
 use core::ffi::c_void;
 use core::mem::size_of;
 use core::ptr;
+use core::slice;
 
 use crate::ffi::types::{
     lzma_allocator, lzma_index, lzma_ret, lzma_stream_flags, lzma_vli, LZMA_DATA_ERROR,
-    LZMA_OK, LZMA_PROG_ERROR, LZMA_VLI_UNKNOWN,
+    LZMA_MEM_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_VLI_UNKNOWN,
 };
 use crate::internal::common::{lzma_alloc, lzma_free, LZMA_VLI_MAX};
 use crate::internal::stream_flags::{
@@ -23,21 +24,143 @@ pub(crate) struct IndexRecord {
     pub(crate) unpadded_sum: lzma_vli,
 }
 
-#[derive(Clone)]
+struct RawIndexVec<T> {
+    ptr: *mut T,
+    len: usize,
+    cap: usize,
+}
+
+impl<T> RawIndexVec<T> {
+    const fn new() -> Self {
+        Self {
+            ptr: ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    fn capacity(&self) -> usize {
+        self.cap
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
+    unsafe fn as_slice(&self) -> &[T] {
+        if self.len == 0 {
+            &[]
+        } else {
+            slice::from_raw_parts(self.ptr, self.len)
+        }
+    }
+
+    #[inline]
+    unsafe fn as_mut_slice(&mut self) -> &mut [T] {
+        if self.len == 0 {
+            &mut []
+        } else {
+            slice::from_raw_parts_mut(self.ptr, self.len)
+        }
+    }
+
+    unsafe fn reserve_exact(&mut self, new_cap: usize, allocator: *const lzma_allocator) -> bool {
+        if new_cap <= self.cap {
+            return true;
+        }
+
+        let Some(bytes) = new_cap.checked_mul(size_of::<T>()) else {
+            return false;
+        };
+        let new_ptr = lzma_alloc(bytes, allocator).cast::<T>();
+        if new_ptr.is_null() {
+            return false;
+        }
+
+        if self.len != 0 {
+            ptr::copy_nonoverlapping(self.ptr, new_ptr, self.len);
+        }
+
+        if !self.ptr.is_null() {
+            lzma_free(self.ptr.cast(), allocator);
+        }
+
+        self.ptr = new_ptr;
+        self.cap = new_cap;
+        true
+    }
+
+    unsafe fn reserve_for_push(&mut self, grow_by: usize, allocator: *const lzma_allocator) -> bool {
+        let Some(required) = self.len.checked_add(1) else {
+            return false;
+        };
+        if required <= self.cap {
+            return true;
+        }
+
+        let growth = grow_by.max(required.saturating_sub(self.cap)).max(1);
+        let Some(new_cap) = self.cap.checked_add(growth) else {
+            return false;
+        };
+        self.reserve_exact(new_cap, allocator)
+    }
+
+    unsafe fn push_with_growth(
+        &mut self,
+        value: T,
+        grow_by: usize,
+        allocator: *const lzma_allocator,
+    ) -> bool {
+        if !self.reserve_for_push(grow_by, allocator) {
+            return false;
+        }
+
+        self.push_unchecked(value);
+        true
+    }
+
+    #[inline]
+    unsafe fn push_unchecked(&mut self, value: T) {
+        ptr::write(self.ptr.add(self.len), value);
+        self.len += 1;
+    }
+
+    #[inline]
+    unsafe fn clear_storage(&mut self) {
+        self.ptr = ptr::null_mut();
+        self.len = 0;
+        self.cap = 0;
+    }
+
+    unsafe fn free_storage(&mut self, allocator: *const lzma_allocator) {
+        if !self.ptr.is_null() {
+            lzma_free(self.ptr.cast(), allocator);
+        }
+        self.clear_storage();
+    }
+}
+
 pub(crate) struct IndexStream {
     pub(crate) compressed_base: lzma_vli,
     pub(crate) uncompressed_base: lzma_vli,
     pub(crate) number: u32,
     pub(crate) block_number_base: lzma_vli,
-    pub(crate) records: Vec<IndexRecord>,
+    records: RawIndexVec<IndexRecord>,
     pub(crate) index_list_size: lzma_vli,
     pub(crate) stream_flags: Option<lzma_stream_flags>,
     pub(crate) stream_padding: lzma_vli,
 }
 
-#[derive(Clone)]
 pub(crate) struct Index {
-    pub(crate) streams: Vec<IndexStream>,
+    streams: RawIndexVec<IndexStream>,
     pub(crate) uncompressed_size: lzma_vli,
     pub(crate) total_size: lzma_vli,
     pub(crate) record_count: lzma_vli,
@@ -116,11 +239,16 @@ impl IndexStream {
             uncompressed_base,
             number,
             block_number_base,
-            records: Vec::new(),
+            records: RawIndexVec::new(),
             index_list_size: 0,
             stream_flags: None,
             stream_padding: 0,
         }
+    }
+
+    #[inline]
+    pub(crate) fn records(&self) -> &[IndexRecord] {
+        unsafe { self.records.as_slice() }
     }
 
     #[inline]
@@ -129,8 +257,18 @@ impl IndexStream {
     }
 
     #[inline]
+    pub(crate) fn record_len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[inline]
+    pub(crate) fn record_capacity(&self) -> usize {
+        self.records.capacity()
+    }
+
+    #[inline]
     pub(crate) fn last_record(&self) -> Option<&IndexRecord> {
-        self.records.last()
+        self.records().last()
     }
 
     #[inline]
@@ -158,12 +296,50 @@ impl IndexStream {
     pub(crate) fn file_end(&self) -> lzma_vli {
         self.compressed_base + self.compressed_size() + self.stream_padding
     }
+
+    pub(crate) unsafe fn push_record(
+        &mut self,
+        record: IndexRecord,
+        grow_by: usize,
+        allocator: *const lzma_allocator,
+    ) -> bool {
+        self.records.push_with_growth(record, grow_by, allocator)
+    }
+
+    unsafe fn clone_in(&self, allocator: *const lzma_allocator) -> Option<Self> {
+        let mut cloned = Self::new(
+            self.compressed_base,
+            self.uncompressed_base,
+            self.number,
+            self.block_number_base,
+        );
+        cloned.index_list_size = self.index_list_size;
+        cloned.stream_flags = self.stream_flags;
+        cloned.stream_padding = self.stream_padding;
+
+        if !cloned
+            .records
+            .reserve_exact(self.record_len(), allocator)
+        {
+            return None;
+        }
+
+        for &record in self.records() {
+            cloned.records.push_unchecked(record);
+        }
+
+        Some(cloned)
+    }
+
+    unsafe fn free_contents(&mut self, allocator: *const lzma_allocator) {
+        self.records.free_storage(allocator);
+    }
 }
 
 impl Index {
-    pub(crate) fn new() -> Self {
+    fn empty() -> Self {
         Self {
-            streams: vec![IndexStream::new(0, 0, 1, 0)],
+            streams: RawIndexVec::new(),
             uncompressed_size: 0,
             total_size: 0,
             record_count: 0,
@@ -173,18 +349,123 @@ impl Index {
         }
     }
 
+    pub(crate) unsafe fn new_in(allocator: *const lzma_allocator) -> Option<Self> {
+        let mut index = Self::empty();
+        if !index
+            .streams
+            .push_with_growth(IndexStream::new(0, 0, 1, 0), 1, allocator)
+        {
+            return None;
+        }
+
+        Some(index)
+    }
+
+    pub(crate) fn new() -> Self {
+        unsafe { Self::new_in(ptr::null()).expect("global allocation should succeed in tests") }
+    }
+
+    #[inline]
+    pub(crate) fn streams(&self) -> &[IndexStream] {
+        unsafe { self.streams.as_slice() }
+    }
+
+    #[inline]
+    pub(crate) fn streams_mut(&mut self) -> &mut [IndexStream] {
+        unsafe { self.streams.as_mut_slice() }
+    }
+
+    #[inline]
+    pub(crate) fn stream_count(&self) -> usize {
+        self.streams.len()
+    }
+
     #[inline]
     pub(crate) fn last_stream(&self) -> &IndexStream {
-        self.streams
+        self.streams()
             .last()
             .expect("lzma_index always has at least one stream")
     }
 
     #[inline]
     pub(crate) fn last_stream_mut(&mut self) -> &mut IndexStream {
-        self.streams
+        self.streams_mut()
             .last_mut()
             .expect("lzma_index always has at least one stream")
+    }
+
+    pub(crate) unsafe fn push_stream(
+        &mut self,
+        stream: IndexStream,
+        allocator: *const lzma_allocator,
+    ) -> bool {
+        self.streams.push_with_growth(stream, 1, allocator)
+    }
+
+    unsafe fn reserve_streams(
+        &mut self,
+        additional: usize,
+        allocator: *const lzma_allocator,
+    ) -> bool {
+        if additional == 0 {
+            return true;
+        }
+
+        let Some(required) = self.streams.len().checked_add(additional) else {
+            return false;
+        };
+        self.streams.reserve_exact(required, allocator)
+    }
+
+    unsafe fn append_moved_streams(
+        &mut self,
+        src: &mut RawIndexVec<IndexStream>,
+        allocator: *const lzma_allocator,
+    ) -> bool {
+        if !self.reserve_streams(src.len(), allocator) {
+            return false;
+        }
+
+        for i in 0..src.len() {
+            let stream = ptr::read(src.ptr.add(i));
+            self.streams.push_unchecked(stream);
+        }
+
+        src.free_storage(allocator);
+        true
+    }
+
+    unsafe fn clone_in(&self, allocator: *const lzma_allocator) -> Option<Self> {
+        let mut cloned = Self {
+            streams: RawIndexVec::new(),
+            uncompressed_size: self.uncompressed_size,
+            total_size: self.total_size,
+            record_count: self.record_count,
+            index_list_size: self.index_list_size,
+            prealloc: self.prealloc,
+            checks: self.checks,
+        };
+
+        if !cloned.streams.reserve_exact(self.stream_count(), allocator) {
+            return None;
+        }
+
+        for stream in self.streams() {
+            let Some(stream) = stream.clone_in(allocator) else {
+                cloned.free_contents(allocator);
+                return None;
+            };
+            cloned.streams.push_unchecked(stream);
+        }
+
+        Some(cloned)
+    }
+
+    unsafe fn free_contents(&mut self, allocator: *const lzma_allocator) {
+        for stream in self.streams_mut() {
+            stream.free_contents(allocator);
+        }
+        self.streams.free_storage(allocator);
     }
 }
 
@@ -228,9 +509,10 @@ pub(crate) unsafe fn index_mut(ptr: *mut lzma_index) -> &'static mut Index {
     &mut *ptr.cast::<Index>()
 }
 
-pub(crate) unsafe fn alloc_index(index: Index, allocator: *const lzma_allocator) -> *mut lzma_index {
+pub(crate) unsafe fn alloc_index(mut index: Index, allocator: *const lzma_allocator) -> *mut lzma_index {
     let raw = lzma_alloc(size_of::<Index>(), allocator).cast::<Index>();
     if raw.is_null() {
+        index.free_contents(allocator);
         return ptr::null_mut();
     }
 
@@ -243,7 +525,8 @@ pub(crate) unsafe fn destroy_index(ptr: *mut lzma_index, allocator: *const lzma_
         return;
     }
 
-    ptr::drop_in_place(ptr.cast::<Index>());
+    let index = &mut *ptr.cast::<Index>();
+    index.free_contents(allocator);
     lzma_free(ptr.cast(), allocator);
 }
 
@@ -288,46 +571,11 @@ fn check_bit(check: i32) -> u32 {
     }
 }
 
-unsafe fn dup_probe_allocations(index: &Index, allocator: *const lzma_allocator) -> *mut Index {
-    let base = lzma_alloc(size_of::<Index>(), allocator).cast::<Index>();
-    if base.is_null() {
-        return ptr::null_mut();
-    }
-
-    let mut probes: Vec<*mut c_void> = Vec::new();
-    for stream in &index.streams {
-        let stream_probe = lzma_alloc(1, allocator);
-        if stream_probe.is_null() {
-            for probe in probes {
-                lzma_free(probe, allocator);
-            }
-            lzma_free(base.cast(), allocator);
-            return ptr::null_mut();
-        }
-        probes.push(stream_probe);
-
-        if !stream.records.is_empty() {
-            let group_probe = lzma_alloc(1, allocator);
-            if group_probe.is_null() {
-                for probe in probes {
-                    lzma_free(probe, allocator);
-                }
-                lzma_free(base.cast(), allocator);
-                return ptr::null_mut();
-            }
-            probes.push(group_probe);
-        }
-    }
-
-    for probe in probes {
-        lzma_free(probe, allocator);
-    }
-
-    base
-}
-
 pub(crate) unsafe fn index_init(allocator: *const lzma_allocator) -> *mut lzma_index {
-    alloc_index(Index::new(), allocator)
+    let Some(index) = Index::new_in(allocator) else {
+        return ptr::null_mut();
+    };
+    alloc_index(index, allocator)
 }
 
 pub(crate) unsafe fn index_end(index: *mut lzma_index, allocator: *const lzma_allocator) {
@@ -370,7 +618,7 @@ pub(crate) unsafe fn index_memused(index: *const lzma_index) -> u64 {
     }
 
     let index = index_ref(index);
-    index_memusage(index.streams.len() as lzma_vli, index.record_count)
+    index_memusage(index.stream_count() as lzma_vli, index.record_count)
 }
 
 pub(crate) unsafe fn index_block_count(index: *const lzma_index) -> lzma_vli {
@@ -386,7 +634,7 @@ pub(crate) unsafe fn index_stream_count(index: *const lzma_index) -> lzma_vli {
         return 0;
     }
 
-    index_ref(index).streams.len() as lzma_vli
+    index_ref(index).stream_count() as lzma_vli
 }
 
 pub(crate) unsafe fn index_size(index: *const lzma_index) -> lzma_vli {
@@ -506,7 +754,7 @@ pub(crate) unsafe fn index_stream_padding(
 
 pub(crate) unsafe fn index_append(
     index: *mut lzma_index,
-    _allocator: *const lzma_allocator,
+    allocator: *const lzma_allocator,
     unpadded_size: lzma_vli,
     uncompressed_size: lzma_vli,
 ) -> lzma_ret {
@@ -526,7 +774,7 @@ pub(crate) unsafe fn index_append(
         stream_record_count,
         stream_index_list_size,
         stream_padding,
-        needs_reserve,
+        grow_by,
     ) = {
         let stream = index.last_stream();
         (
@@ -542,11 +790,15 @@ pub(crate) unsafe fn index_append(
             stream.record_count(),
             stream.index_list_size,
             stream.stream_padding,
-            stream.records.capacity() == stream.records.len(),
+            if stream.record_capacity() == stream.record_len() {
+                index.prealloc.max(1)
+            } else {
+                0
+            },
         )
     };
-    let index_list_size_add =
-        lzma_vli_size_impl(unpadded_size) as lzma_vli + lzma_vli_size_impl(uncompressed_size) as lzma_vli;
+    let index_list_size_add = lzma_vli_size_impl(unpadded_size) as lzma_vli
+        + lzma_vli_size_impl(uncompressed_size) as lzma_vli;
 
     if uncompressed_base.checked_add(uncompressed_size).is_none()
         || uncompressed_base + uncompressed_size > LZMA_VLI_MAX
@@ -580,17 +832,23 @@ pub(crate) unsafe fn index_append(
         return LZMA_DATA_ERROR;
     }
 
-    if needs_reserve {
-        let reserve = index.prealloc.max(1);
-        index.last_stream_mut().records.reserve(reserve);
+    let stream = index.last_stream_mut();
+    if !stream.push_record(
+        IndexRecord {
+            uncompressed_sum: uncompressed_base + uncompressed_size,
+            unpadded_sum: compressed_base + unpadded_size,
+        },
+        grow_by,
+        allocator,
+    ) {
+        return LZMA_MEM_ERROR;
+    }
+
+    if grow_by != 0 {
         index.prealloc = INDEX_GROUP_SIZE;
     }
 
     let stream = index.last_stream_mut();
-    stream.records.push(IndexRecord {
-        uncompressed_sum: uncompressed_base + uncompressed_size,
-        unpadded_sum: compressed_base + unpadded_size,
-    });
     stream.index_list_size += index_list_size_add;
 
     index.total_size += vli_ceil4(unpadded_size);
@@ -610,22 +868,43 @@ pub(crate) unsafe fn index_cat(
         return LZMA_PROG_ERROR;
     }
 
-    let dest_ref = index_ref(dest);
-    let src_ref = index_ref(src);
     let dest_file_size = index_file_size(dest);
     let src_file_size = index_file_size(src);
+    let (dest_uncompressed_size, dest_record_count, dest_streams_len, old_checks) = {
+        let dest_ref = index_ref(dest);
+        (
+            dest_ref.uncompressed_size,
+            dest_ref.record_count,
+            dest_ref.stream_count() as u32,
+            index_checks(dest),
+        )
+    };
+    let (src_uncompressed_size, src_record_count, src_index_list_size, src_total_size, src_checks, src_streams_len) =
+        {
+            let src_ref = index_ref(src);
+            (
+                src_ref.uncompressed_size,
+                src_ref.record_count,
+                src_ref.index_list_size,
+                src_ref.total_size,
+                src_ref.checks,
+                src_ref.stream_count(),
+            )
+        };
+
     if dest_file_size == LZMA_VLI_UNKNOWN
         || src_file_size == LZMA_VLI_UNKNOWN
         || dest_file_size.saturating_add(src_file_size) > LZMA_VLI_MAX
-        || dest_ref.uncompressed_size.saturating_add(src_ref.uncompressed_size) > LZMA_VLI_MAX
+        || dest_uncompressed_size.saturating_add(src_uncompressed_size) > LZMA_VLI_MAX
     {
         return LZMA_DATA_ERROR;
     }
 
-    let dest_size =
-        index_size_unpadded_from_counts(dest_ref.record_count, dest_ref.index_list_size);
-    let src_size =
-        index_size_unpadded_from_counts(src_ref.record_count, src_ref.index_list_size);
+    let dest_size = {
+        let dest_ref = index_ref(dest);
+        index_size_unpadded_from_counts(dest_ref.record_count, dest_ref.index_list_size)
+    };
+    let src_size = index_size_unpadded_from_counts(src_record_count, src_index_list_size);
     let Some(combined_size) = dest_size.checked_add(src_size) else {
         return LZMA_DATA_ERROR;
     };
@@ -633,15 +912,14 @@ pub(crate) unsafe fn index_cat(
         return LZMA_DATA_ERROR;
     }
 
-    let old_checks = index_checks(dest);
-    let dest_streams_len = dest_ref.streams.len() as u32;
-    let dest_uncompressed_size = dest_ref.uncompressed_size;
-    let dest_record_count = dest_ref.record_count;
+    if !index_mut(dest).reserve_streams(src_streams_len, allocator) {
+        return LZMA_MEM_ERROR;
+    }
 
     let mut moved = ptr::read(src.cast::<Index>());
     lzma_free(src.cast(), allocator);
 
-    for stream in &mut moved.streams {
+    for stream in moved.streams_mut() {
         stream.compressed_base += dest_file_size;
         stream.uncompressed_base += dest_uncompressed_size;
         stream.number = stream.number.saturating_add(dest_streams_len);
@@ -650,12 +928,14 @@ pub(crate) unsafe fn index_cat(
 
     let dest_mut = index_mut(dest);
     dest_mut.checks = old_checks;
-    dest_mut.uncompressed_size += moved.uncompressed_size;
-    dest_mut.total_size += moved.total_size;
-    dest_mut.record_count += moved.record_count;
-    dest_mut.index_list_size += moved.index_list_size;
-    dest_mut.checks |= moved.checks;
-    dest_mut.streams.extend(moved.streams.drain(..));
+    dest_mut.uncompressed_size += src_uncompressed_size;
+    dest_mut.total_size += src_total_size;
+    dest_mut.record_count += src_record_count;
+    dest_mut.index_list_size += src_index_list_size;
+    dest_mut.checks |= src_checks;
+    if !dest_mut.append_moved_streams(&mut moved.streams, allocator) {
+        return LZMA_MEM_ERROR;
+    }
 
     LZMA_OK
 }
@@ -669,13 +949,18 @@ pub(crate) unsafe fn index_dup(
     }
 
     let src = index_ref(src);
-    let base = dup_probe_allocations(src, allocator);
-    if base.is_null() {
+    let raw = lzma_alloc(size_of::<Index>(), allocator).cast::<Index>();
+    if raw.is_null() {
         return ptr::null_mut();
     }
 
-    ptr::write(base, src.clone());
-    base.cast::<lzma_index>()
+    let Some(cloned) = src.clone_in(allocator) else {
+        lzma_free(raw.cast(), allocator);
+        return ptr::null_mut();
+    };
+
+    ptr::write(raw, cloned);
+    raw.cast::<lzma_index>()
 }
 
 pub(crate) fn index_prealloc(index: &mut Index, records: lzma_vli) {
@@ -720,7 +1005,7 @@ mod tests {
         };
 
         unsafe {
-            let raw = alloc_index(index.clone(), ptr::null());
+            let raw = alloc_index(index.clone_in(ptr::null()).unwrap(), ptr::null());
             assert_eq!(index_stream_flags(raw, &flags), LZMA_OK);
             assert_eq!(index_checks(raw), 1u32 << LZMA_CHECK_CRC32);
             assert_eq!(index_file_size(raw), 32);
@@ -729,6 +1014,46 @@ mod tests {
 
         index.last_stream_mut().stream_flags = Some(flags);
         assert_eq!(index.last_stream().compressed_size(), 32);
+    }
+
+    #[test]
+    fn allocator_is_used_for_init_append_and_cat() {
+        unsafe extern "C" fn record_alloc(
+            opaque: *mut c_void,
+            _nmemb: usize,
+            size: usize,
+        ) -> *mut c_void {
+            let count = &mut *opaque.cast::<usize>();
+            *count += 1;
+            libc::malloc(size.max(1))
+        }
+
+        unsafe extern "C" fn record_free(_opaque: *mut c_void, ptr: *mut c_void) {
+            libc::free(ptr);
+        }
+
+        let mut alloc_count = 0usize;
+        let allocator = lzma_allocator {
+            alloc: Some(record_alloc),
+            free: Some(record_free),
+            opaque: (&mut alloc_count as *mut usize).cast(),
+        };
+
+        unsafe {
+            let dest = index_init(&allocator);
+            assert!(!dest.is_null());
+            assert_eq!(alloc_count, 2);
+
+            assert_eq!(index_append(dest, &allocator, UNPADDED_SIZE_MIN, 1), LZMA_OK);
+            assert_eq!(alloc_count, 3);
+
+            let src = index_init(&allocator);
+            assert!(!src.is_null());
+            assert_eq!(index_cat(dest, src, &allocator), LZMA_OK);
+            assert!(alloc_count >= 6);
+
+            destroy_index(dest, &allocator);
+        }
     }
 
     #[test]
