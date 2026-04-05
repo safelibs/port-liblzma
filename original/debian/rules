@@ -1,0 +1,133 @@
+#!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ $(opt_no_act)
+
+override_dh_auto_clean:
+	if [ -f doc/api.backup.done ]; then rm -rf doc/api; mv doc/api.backup doc/api; rm doc/api.backup.done; else rm -rf doc/api.backup*; fi
+	dh_auto_clean --builddirectory debian/xzdec-build
+	dh_auto_clean --builddirectory debian/normal-build
+	dh_auto_clean --builddirectory debian/static-build
+
+override_dh_auto_install-indep:
+
+override_dh_auto_install-arch:
+	dh_auto_install --builddirectory debian/xzdec-build
+	dh_auto_install --builddirectory debian/normal-build
+	dh_auto_install --builddirectory debian/static-build
+
+override_dh_installchangelogs:
+	dh_installchangelogs ChangeLog
+
+override_dh_auto_build-indep:
+	if [ ! -d doc/api.backup ]; then cp --reflink=auto -ra doc/api doc/api.backup; touch doc/api.backup.done; fi
+	cd doxygen && sh update-doxygen
+
+override_dh_auto_build-arch:
+	dh_auto_build --builddirectory debian/normal-build
+	dh_auto_build --builddirectory debian/static-build
+	# The xzdec binary/ package is built with -Os as suggested in PACKAGERS
+	# to create a small binary.
+	@echo "blhc: ignore-line-regexp: .*-D_BLHC_IGNORE_THIS_LINE.*"
+	dh_auto_build --builddirectory debian/xzdec-build
+
+override_dh_auto_test-indep:
+
+override_dh_auto_test-arch:
+ifneq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+	@echo Skipping tests
+else
+	dh_auto_test --builddirectory debian/normal-build
+	dh_auto_test --builddirectory debian/static-build
+	dh_auto_test --builddirectory debian/xzdec-build
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory debian/normal-build -- \
+		$(opt_reproduce) \
+		--enable-threads --disable-static \
+		$(opt_optimize) $(opt_quiet) \
+		--disable-xzdec --disable-lzmadec
+	dh_auto_configure --builddirectory debian/static-build -- \
+		$(opt_reproduce) \
+		--enable-threads --disable-shared \
+		--enable-liblzma2-compat \
+		$(opt_optimize) $(opt_quiet) \
+		--disable-lzmainfo --disable-scripts \
+		--disable-xzdec --disable-lzmadec \
+		--disable-xz --disable-lzma-links
+	dh_auto_configure --builddirectory debian/xzdec-build -- \
+		$(opt_reproduce) \
+		--disable-shared --disable-nls --disable-encoders \
+		--enable-small --disable-threads \
+		--disable-liblzma2-compat \
+		$(opt_optimize_small) $(opt_quiet) \
+		--disable-lzmainfo --disable-scripts \
+		--disable-xz --disable-lzma-links
+
+small_flags_env =
+small_flags_env += DEB_CFLAGS_MAINT_STRIP='-O2 -O3'
+small_flags_env += DEB_CFLAGS_MAINT_PREPEND='-Os -D_BLHC_IGNORE_THIS_LINE'
+flags_cmd = dpkg-buildflags --export=configure
+opt_optimize = $(shell $(flags_cmd))
+opt_optimize_small = $(shell $(small_flags_env) $(flags_cmd))
+opt_reproduce = gl_cv_posix_shell=/bin/sh
+
+opt_no_act =
+opt_quiet =
+
+# Unless noopt is set, use optimized CRC32 routine on the Hurd.
+ifeq (hurd,$(shell dpkg-architecture -qDEB_HOST_ARCH_OS))
+    cputype := $(shell dpkg-architecture -qDEB_HOST_ARCH_CPU)
+    ifeq (i386,$(cputype))
+        opt_optimize += --enable-assembler=x86
+        opt_optimize_small += --enable-assembler=x86
+    endif
+endif
+
+ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+    opt_optimize += --disable-assembler
+    opt_optimize_small += --disable-assembler
+endif
+
+ifneq (,$(findstring n,$(MAKEFLAGS)))
+    opt_no_act = --no-act
+endif
+
+ifneq (,$(filter quiet,$(DEB_BUILD_OPTIONS)))
+    opt_quiet = --quiet
+    MAKEFLAGS += --quiet
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs --add-udeb=liblzma5-udeb
+
+# Build a tarball with the latest upstream version.
+# This is made complicated by the need to choose a nice version number.
+REPO = https://git.tukaani.org/xz.git
+BRANCH = master
+get-orig-source:
+	mkdir debian-orig-source
+	-set -e; cd debian-orig-source; \
+	: Fetch latest upstream version.; \
+		git init -q; \
+		git fetch -q --tags $(REPO); \
+		git fetch -q $(REPO) $(BRANCH); \
+	: Determine version number.; \
+		commit_name=$$(git describe FETCH_HEAD); \
+		release=$${commit_name%%-*}; \
+		date=$$(date --utc --date="$$( \
+			git log -1 --pretty=format:%cD "$$commit_name" \
+			)" "+%Y%m%d"); \
+		if test "$$commit_name" = "$$release"; \
+		then upstream_version=$${commit_name#v}; \
+		else upstream_version="$${release#v}+$${date}"; \
+		fi; \
+	: Generate tarball.; \
+		echo "packaging $$commit_name"; \
+		git archive --format=tar "$$commit_name" \
+			--prefix="xz-utils-$$upstream_version/" | \
+		gzip -n --rsyncable -9 \
+			> "../xz-utils_$$upstream_version.orig.tar.gz"
+	rm -fr debian-orig-source
