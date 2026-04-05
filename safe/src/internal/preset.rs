@@ -1,8 +1,8 @@
 use crate::ffi::types::{lzma_bool, lzma_match_finder, lzma_mode, lzma_options_lzma};
 use crate::internal::common::{
     lzma_bool as to_lzma_bool, LZMA_LC_DEFAULT, LZMA_LP_DEFAULT, LZMA_MF_BT2, LZMA_MF_BT3,
-    LZMA_MF_BT4, LZMA_MF_HC3, LZMA_MF_HC4, LZMA_MODE_FAST, LZMA_MODE_NORMAL,
-    LZMA_PB_DEFAULT, LZMA_PRESET_EXTREME, LZMA_PRESET_LEVEL_MASK,
+    LZMA_MF_BT4, LZMA_MF_HC3, LZMA_MF_HC4, LZMA_MODE_FAST, LZMA_MODE_NORMAL, LZMA_PB_DEFAULT,
+    LZMA_PRESET_EXTREME, LZMA_PRESET_LEVEL_MASK,
 };
 
 pub(crate) unsafe fn lzma_lzma_preset_impl(
@@ -97,7 +97,10 @@ mod tests {
     fn extreme_preset_updates_search_depth() {
         let mut options = unsafe { core::mem::zeroed::<lzma_options_lzma>() };
         unsafe {
-            assert_eq!(lzma_lzma_preset_impl(&mut options, 3 | LZMA_PRESET_EXTREME), 0);
+            assert_eq!(
+                lzma_lzma_preset_impl(&mut options, 3 | LZMA_PRESET_EXTREME),
+                0
+            );
         }
 
         assert_eq!(options.mode, LZMA_MODE_NORMAL);

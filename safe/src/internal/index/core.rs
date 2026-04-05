@@ -8,9 +8,7 @@ use crate::ffi::types::{
     LZMA_MEM_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_VLI_UNKNOWN,
 };
 use crate::internal::common::{lzma_alloc, lzma_free, LZMA_VLI_MAX};
-use crate::internal::stream_flags::{
-    self, LZMA_BACKWARD_SIZE_MAX, LZMA_STREAM_HEADER_SIZE,
-};
+use crate::internal::stream_flags::{self, LZMA_BACKWARD_SIZE_MAX, LZMA_STREAM_HEADER_SIZE};
 use crate::internal::vli::lzma_vli_size_impl;
 
 pub(crate) const UNPADDED_SIZE_MIN: lzma_vli = 5;
@@ -98,7 +96,11 @@ impl<T> RawIndexVec<T> {
         true
     }
 
-    unsafe fn reserve_for_push(&mut self, grow_by: usize, allocator: *const lzma_allocator) -> bool {
+    unsafe fn reserve_for_push(
+        &mut self,
+        grow_by: usize,
+        allocator: *const lzma_allocator,
+    ) -> bool {
         let Some(required) = self.len.checked_add(1) else {
             return false;
         };
@@ -317,10 +319,7 @@ impl IndexStream {
         cloned.stream_flags = self.stream_flags;
         cloned.stream_padding = self.stream_padding;
 
-        if !cloned
-            .records
-            .reserve_exact(self.record_len(), allocator)
-        {
+        if !cloned.records.reserve_exact(self.record_len(), allocator) {
             return None;
         }
 
@@ -509,7 +508,10 @@ pub(crate) unsafe fn index_mut(ptr: *mut lzma_index) -> &'static mut Index {
     &mut *ptr.cast::<Index>()
 }
 
-pub(crate) unsafe fn alloc_index(mut index: Index, allocator: *const lzma_allocator) -> *mut lzma_index {
+pub(crate) unsafe fn alloc_index(
+    mut index: Index,
+    allocator: *const lzma_allocator,
+) -> *mut lzma_index {
     let raw = lzma_alloc(size_of::<Index>(), allocator).cast::<Index>();
     if raw.is_null() {
         index.free_contents(allocator);
@@ -531,12 +533,10 @@ pub(crate) unsafe fn destroy_index(ptr: *mut lzma_index, allocator: *const lzma_
 }
 
 pub(crate) fn index_padding_size_of(index: &Index) -> u32 {
-    (4u64
-        .wrapping_sub(index_size_unpadded_from_counts(
-            index.record_count,
-            index.index_list_size,
-        ))
-        & 3) as u32
+    (4u64.wrapping_sub(index_size_unpadded_from_counts(
+        index.record_count,
+        index.index_list_size,
+    )) & 3) as u32
 }
 
 fn index_file_size_inner(
@@ -586,9 +586,9 @@ pub(crate) fn index_memusage(streams: lzma_vli, blocks: lzma_vli) -> u64 {
     let alloc_overhead = 4 * size_of::<*const c_void>();
     let stream_base =
         size_of::<UpstreamIndexStream>() + size_of::<UpstreamIndexGroup>() + 2 * alloc_overhead;
-    let group_base =
-        size_of::<UpstreamIndexGroup>() + INDEX_GROUP_SIZE * size_of::<UpstreamIndexRecord>()
-            + alloc_overhead;
+    let group_base = size_of::<UpstreamIndexGroup>()
+        + INDEX_GROUP_SIZE * size_of::<UpstreamIndexRecord>()
+        + alloc_overhead;
     let index_base = size_of::<UpstreamIndex>() + alloc_overhead;
 
     let groups = (blocks + INDEX_GROUP_SIZE as lzma_vli - 1) / INDEX_GROUP_SIZE as lzma_vli;
@@ -735,7 +735,10 @@ pub(crate) unsafe fn index_stream_padding(
     let old_padding = stream.stream_padding;
     stream.stream_padding = 0;
 
-    let unpadded_sum = stream.last_record().map(|record| record.unpadded_sum).unwrap_or(0);
+    let unpadded_sum = stream
+        .last_record()
+        .map(|record| record.unpadded_sum)
+        .unwrap_or(0);
     let ok = index_file_size_inner(
         stream.compressed_base,
         unpadded_sum,
@@ -879,18 +882,24 @@ pub(crate) unsafe fn index_cat(
             index_checks(dest),
         )
     };
-    let (src_uncompressed_size, src_record_count, src_index_list_size, src_total_size, src_checks, src_streams_len) =
-        {
-            let src_ref = index_ref(src);
-            (
-                src_ref.uncompressed_size,
-                src_ref.record_count,
-                src_ref.index_list_size,
-                src_ref.total_size,
-                src_ref.checks,
-                src_ref.stream_count(),
-            )
-        };
+    let (
+        src_uncompressed_size,
+        src_record_count,
+        src_index_list_size,
+        src_total_size,
+        src_checks,
+        src_streams_len,
+    ) = {
+        let src_ref = index_ref(src);
+        (
+            src_ref.uncompressed_size,
+            src_ref.record_count,
+            src_ref.index_list_size,
+            src_ref.total_size,
+            src_ref.checks,
+            src_ref.stream_count(),
+        )
+    };
 
     if dest_file_size == LZMA_VLI_UNKNOWN
         || src_file_size == LZMA_VLI_UNKNOWN
@@ -1044,7 +1053,10 @@ mod tests {
             assert!(!dest.is_null());
             assert_eq!(alloc_count, 2);
 
-            assert_eq!(index_append(dest, &allocator, UNPADDED_SIZE_MIN, 1), LZMA_OK);
+            assert_eq!(
+                index_append(dest, &allocator, UNPADDED_SIZE_MIN, 1),
+                LZMA_OK
+            );
             assert_eq!(alloc_count, 3);
 
             let src = index_init(&allocator);
@@ -1087,7 +1099,10 @@ mod tests {
             assert!(!copy.is_null());
             destroy_index(copy, &allocator);
 
-            assert_eq!(index_append(raw, ptr::null(), UNPADDED_SIZE_MIN, 1), LZMA_OK);
+            assert_eq!(
+                index_append(raw, ptr::null(), UNPADDED_SIZE_MIN, 1),
+                LZMA_OK
+            );
             counter = 0;
             assert_eq!(counter, 0);
             assert!(index_dup(raw, &allocator).is_null());

@@ -2,8 +2,8 @@ use core::mem;
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_index, lzma_index_iter, lzma_index_iter_block, lzma_index_iter_mode,
-    lzma_index_iter_stream, lzma_bool, lzma_vli,
+    lzma_bool, lzma_index, lzma_index_iter, lzma_index_iter_block, lzma_index_iter_mode,
+    lzma_index_iter_stream, lzma_vli,
 };
 use crate::internal::common::lzma_bool as to_lzma_bool;
 use crate::internal::stream_flags::LZMA_STREAM_HEADER_SIZE;
@@ -177,7 +177,9 @@ fn candidate_next(
                     }
                 }
 
-                if mode == LZMA_INDEX_ITER_BLOCK || has_nonempty_block(&index.streams()[stream], record) {
+                if mode == LZMA_INDEX_ITER_BLOCK
+                    || has_nonempty_block(&index.streams()[stream], record)
+                {
                     return Some((stream, Some(record)));
                 }
             }
@@ -251,7 +253,8 @@ pub(crate) unsafe fn index_iter_next(
 
     let current_stream = read_stream_pos(&*iter);
     let current_record = read_record_pos(&*iter);
-    let Some((next_stream, next_record)) = candidate_next(index, current_stream, current_record, mode)
+    let Some((next_stream, next_record)) =
+        candidate_next(index, current_stream, current_record, mode)
     else {
         return 1;
     };
@@ -380,13 +383,25 @@ mod tests {
         let mut iter: lzma_index_iter = unsafe { mem::zeroed() };
         unsafe {
             index_iter_init(&mut iter, (&index as *const Index).cast::<lzma_index>());
-            assert_eq!(index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK), 0);
+            assert_eq!(
+                index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK),
+                0
+            );
             assert_eq!(iter.block.number_in_file, 2);
-            assert_eq!(index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK), 0);
+            assert_eq!(
+                index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK),
+                0
+            );
             assert_eq!(iter.block.number_in_file, 3);
-            assert_eq!(index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK), 0);
+            assert_eq!(
+                index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK),
+                0
+            );
             assert_eq!(iter.block.number_in_file, 4);
-            assert_eq!(index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK), 1);
+            assert_eq!(
+                index_iter_next(&mut iter, LZMA_INDEX_ITER_NONEMPTY_BLOCK),
+                1
+            );
         }
     }
 }

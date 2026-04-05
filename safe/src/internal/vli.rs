@@ -1,6 +1,5 @@
 use crate::ffi::types::{
-    lzma_ret, lzma_vli, LZMA_BUF_ERROR, LZMA_DATA_ERROR, LZMA_OK, LZMA_PROG_ERROR,
-    LZMA_STREAM_END,
+    lzma_ret, lzma_vli, LZMA_BUF_ERROR, LZMA_DATA_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
 };
 use crate::internal::common::{LZMA_VLI_BYTES_MAX, LZMA_VLI_MAX};
 
@@ -46,7 +45,11 @@ pub(crate) unsafe fn lzma_vli_encode_impl(
         *out_pos += 1;
 
         if *out_pos == out_size {
-            return if single_call { LZMA_PROG_ERROR } else { LZMA_OK };
+            return if single_call {
+                LZMA_PROG_ERROR
+            } else {
+                LZMA_OK
+            };
         }
     }
 
@@ -111,7 +114,11 @@ pub(crate) unsafe fn lzma_vli_decode_impl(
                 return LZMA_DATA_ERROR;
             }
 
-            return if single_call { LZMA_OK } else { LZMA_STREAM_END };
+            return if single_call {
+                LZMA_OK
+            } else {
+                LZMA_STREAM_END
+            };
         }
 
         if *vli_pos == LZMA_VLI_BYTES_MAX {
@@ -165,7 +172,13 @@ mod tests {
 
         unsafe {
             assert_eq!(
-                lzma_vli_encode_impl(526_617, core::ptr::null_mut(), out.as_mut_ptr(), &mut out_pos, 3),
+                lzma_vli_encode_impl(
+                    526_617,
+                    core::ptr::null_mut(),
+                    out.as_mut_ptr(),
+                    &mut out_pos,
+                    3
+                ),
                 LZMA_OK
             );
         }
@@ -205,7 +218,10 @@ mod tests {
             );
         }
 
-        assert_eq!(&out, &[0x81, 0x91, 0xA1, 0xB1, 0xC1, 0xD1, 0xE1, 0xF1, 0x01]);
+        assert_eq!(
+            &out,
+            &[0x81, 0x91, 0xA1, 0xB1, 0xC1, 0xD1, 0xE1, 0xF1, 0x01]
+        );
     }
 
     #[test]

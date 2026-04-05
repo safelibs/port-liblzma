@@ -113,14 +113,22 @@ impl IndexDecoderState {
                     if *input.add(*in_pos) != INDEX_INDICATOR {
                         return LZMA_DATA_ERROR;
                     }
-                    self.crc32 = crc32::crc32(core::slice::from_raw_parts(input.add(*in_pos), 1), self.crc32);
+                    self.crc32 = crc32::crc32(
+                        core::slice::from_raw_parts(input.add(*in_pos), 1),
+                        self.crc32,
+                    );
                     *in_pos += 1;
                     self.sequence = SEQ_COUNT;
                 }
                 SEQ_COUNT => {
                     let start = *in_pos;
-                    let ret =
-                        lzma_vli_decode_impl(&mut self.count, &mut self.pos, input, in_pos, in_size);
+                    let ret = lzma_vli_decode_impl(
+                        &mut self.count,
+                        &mut self.pos,
+                        input,
+                        in_pos,
+                        in_size,
+                    );
                     if *in_pos > start {
                         self.crc32 = crc32::crc32(
                             core::slice::from_raw_parts(input.add(start), *in_pos - start),
@@ -140,11 +148,11 @@ impl IndexDecoderState {
                     }
 
                     index_prealloc(index_mut(self.index), self.count);
-                self.sequence = if self.count == 0 {
-                    SEQ_PADDING_INIT
-                } else {
-                    SEQ_UNPADDED
-                };
+                    self.sequence = if self.count == 0 {
+                        SEQ_PADDING_INIT
+                    } else {
+                        SEQ_UNPADDED
+                    };
                 }
                 SEQ_UNPADDED | SEQ_UNCOMPRESSED => {
                     let start = *in_pos;
@@ -201,8 +209,10 @@ impl IndexDecoderState {
                         if *input.add(*in_pos) != 0 {
                             return LZMA_DATA_ERROR;
                         }
-                        self.crc32 =
-                            crc32::crc32(core::slice::from_raw_parts(input.add(*in_pos), 1), self.crc32);
+                        self.crc32 = crc32::crc32(
+                            core::slice::from_raw_parts(input.add(*in_pos), 1),
+                            self.crc32,
+                        );
                         *in_pos += 1;
                     } else {
                         self.sequence = SEQ_CRC32;
@@ -292,7 +302,8 @@ pub(crate) unsafe fn index_decoder(
         Err(ret) => return ret,
     };
 
-    let raw = lzma_alloc(size_of::<IndexDecoderStream>(), (*strm).allocator).cast::<IndexDecoderStream>();
+    let raw =
+        lzma_alloc(size_of::<IndexDecoderStream>(), (*strm).allocator).cast::<IndexDecoderStream>();
     if raw.is_null() {
         let mut state = state;
         state.end((*strm).allocator);

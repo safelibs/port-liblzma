@@ -17,6 +17,4 @@ pub(crate) use file_info::file_info_decoder;
 pub(crate) use hash::{
     index_hash_append, index_hash_decode, index_hash_end, index_hash_init, index_hash_size,
 };
-pub(crate) use iter::{
-    index_iter_init, index_iter_locate, index_iter_next, index_iter_rewind,
-};
+pub(crate) use iter::{index_iter_init, index_iter_locate, index_iter_next, index_iter_rewind};

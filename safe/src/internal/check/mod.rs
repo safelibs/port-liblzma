@@ -2,7 +2,7 @@ pub(crate) mod crc32;
 pub(crate) mod crc64;
 pub(crate) mod sha256;
 
-use crate::ffi::types::{lzma_check, lzma_bool};
+use crate::ffi::types::{lzma_bool, lzma_check};
 use crate::internal::common::{
     lzma_bool as to_lzma_bool, LZMA_CHECK_CRC32, LZMA_CHECK_CRC64, LZMA_CHECK_ID_MAX,
     LZMA_CHECK_SHA256,
@@ -54,7 +54,10 @@ pub(crate) fn check_is_supported(check: lzma_check) -> lzma_bool {
 
     to_lzma_bool(matches!(
         check,
-        crate::ffi::types::LZMA_CHECK_NONE | LZMA_CHECK_CRC32 | LZMA_CHECK_CRC64 | LZMA_CHECK_SHA256
+        crate::ffi::types::LZMA_CHECK_NONE
+            | LZMA_CHECK_CRC32
+            | LZMA_CHECK_CRC64
+            | LZMA_CHECK_SHA256
     ))
 }
 
@@ -96,9 +99,6 @@ mod tests {
 
         let mut sha = CheckState::new(LZMA_CHECK_SHA256).unwrap();
         sha.update(b"123456789");
-        assert_eq!(
-            &sha.finish()[..4],
-            &[0x15, 0xE2, 0xB0, 0xD3]
-        );
+        assert_eq!(&sha.finish()[..4], &[0x15, 0xE2, 0xB0, 0xD3]);
     }
 }

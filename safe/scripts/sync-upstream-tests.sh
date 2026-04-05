@@ -8,4 +8,4 @@ dest_dir="$repo_root/safe/tests/upstream"
 
 rm -rf "$dest_dir"
 mkdir -p "$dest_dir"
-cp -a "$src_dir/." "$dest_dir/"
+command cp -a "$src_dir/." "$dest_dir/"

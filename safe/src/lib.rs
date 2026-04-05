@@ -4,14 +4,17 @@ pub mod ffi;
 mod internal {
     #![allow(dead_code)]
 
+    pub(crate) mod block;
     pub(crate) mod check;
     pub(crate) mod common;
+    pub(crate) mod container;
     pub(crate) mod filter;
     pub(crate) mod hardware;
     pub(crate) mod index;
     pub(crate) mod preset;
     pub(crate) mod stream_flags;
     pub(crate) mod stream_state;
+    pub(crate) mod upstream;
     pub(crate) mod vli;
 }
 

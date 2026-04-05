@@ -11,5 +11,5 @@ rm -f "$dest_dir/lzma.h"
 rm -rf "$dest_dir/lzma"
 mkdir -p "$dest_dir/lzma"
 
-cp -a "$src_dir/lzma.h" "$dest_dir/lzma.h"
-cp -a "$src_dir/lzma/." "$dest_dir/lzma/"
+command cp -a "$src_dir/lzma.h" "$dest_dir/lzma.h"
+command cp -a "$src_dir/lzma/." "$dest_dir/lzma/"

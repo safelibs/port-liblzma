@@ -2,8 +2,8 @@ use core::mem::size_of;
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_allocator, lzma_index_hash, lzma_ret, lzma_vli, LZMA_BUF_ERROR, LZMA_DATA_ERROR,
-    LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
+    lzma_allocator, lzma_index_hash, lzma_ret, lzma_vli, LZMA_BUF_ERROR, LZMA_DATA_ERROR, LZMA_OK,
+    LZMA_PROG_ERROR, LZMA_STREAM_END,
 };
 use crate::internal::check::{crc32, sha256::Sha256State};
 use crate::internal::common::{lzma_alloc, lzma_free, LZMA_VLI_MAX};
@@ -158,7 +158,8 @@ pub(crate) unsafe fn index_hash_append(
     }
 
     let hash = hash_mut(index_hash);
-    hash.blocks.append_unchecked(unpadded_size, uncompressed_size);
+    hash.blocks
+        .append_unchecked(unpadded_size, uncompressed_size);
 
     let size = index_size_from_counts(hash.blocks.count, hash.blocks.index_list_size);
     if hash.blocks.blocks_size > LZMA_VLI_MAX
@@ -238,12 +239,15 @@ pub(crate) unsafe fn index_hash_decode(
                 ret = LZMA_OK;
 
                 if hash.sequence == SEQ_UNPADDED {
-                    if hash.unpadded_size < UNPADDED_SIZE_MIN || hash.unpadded_size > UNPADDED_SIZE_MAX {
+                    if hash.unpadded_size < UNPADDED_SIZE_MIN
+                        || hash.unpadded_size > UNPADDED_SIZE_MAX
+                    {
                         return LZMA_DATA_ERROR;
                     }
                     hash.sequence = SEQ_UNCOMPRESSED;
                 } else {
-                    hash.records.append_unchecked(hash.unpadded_size, hash.uncompressed_size);
+                    hash.records
+                        .append_unchecked(hash.unpadded_size, hash.uncompressed_size);
                     if hash.blocks.blocks_size < hash.records.blocks_size
                         || hash.blocks.uncompressed_size < hash.records.uncompressed_size
                         || hash.blocks.index_list_size < hash.records.index_list_size
@@ -261,14 +265,10 @@ pub(crate) unsafe fn index_hash_decode(
                 }
             }
             SEQ_PADDING_INIT => {
-                hash.pos =
-                    ((4u64
-                        .wrapping_sub(index_size_unpadded_from_counts(
-                            hash.records.count,
-                            hash.records.index_list_size,
-                        )))
-                        & 3)
-                        as usize;
+                hash.pos = ((4u64.wrapping_sub(index_size_unpadded_from_counts(
+                    hash.records.count,
+                    hash.records.index_list_size,
+                ))) & 3) as usize;
                 hash.sequence = SEQ_PADDING;
             }
             SEQ_PADDING => {
@@ -320,7 +320,10 @@ pub(crate) unsafe fn index_hash_decode(
 
     let used = *in_pos - in_start;
     if used > 0 {
-        hash.crc32 = crc32::crc32(core::slice::from_raw_parts(input.add(in_start), used), hash.crc32);
+        hash.crc32 = crc32::crc32(
+            core::slice::from_raw_parts(input.add(in_start), used),
+            hash.crc32,
+        );
     }
     ret
 }

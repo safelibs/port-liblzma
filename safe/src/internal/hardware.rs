@@ -24,7 +24,11 @@ pub(crate) fn physmem() -> u64 {
             core::ptr::null_mut(),
             0,
         );
-        if ret == 0 { value } else { 0 }
+        if ret == 0 {
+            value
+        } else {
+            0
+        }
     }
 }
 

@@ -70,12 +70,8 @@ fn crc64_slice_by_4(buf: &[u8], crc: u64) -> u64 {
 
         let limit = index + ((len - index) & !3usize);
         while index < limit {
-            let block = u32::from_le_bytes([
-                buf[index],
-                buf[index + 1],
-                buf[index + 2],
-                buf[index + 3],
-            ]);
+            let block =
+                u32::from_le_bytes([buf[index], buf[index + 1], buf[index + 2], buf[index + 3]]);
             let tmp = (crc as u32) ^ block;
             crc = CRC64_TABLE[3][(tmp & 0xFF) as usize]
                 ^ CRC64_TABLE[2][((tmp >> 8) & 0xFF) as usize]

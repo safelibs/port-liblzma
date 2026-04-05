@@ -3,14 +3,14 @@ use core::mem;
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_action, lzma_allocator, lzma_check, lzma_internal, lzma_ret, lzma_stream,
-    LZMA_BUF_ERROR, LZMA_GET_CHECK, LZMA_MEM_ERROR, LZMA_MEMLIMIT_ERROR, LZMA_NO_CHECK,
-    LZMA_OK, LZMA_PROG_ERROR, LZMA_SEEK_NEEDED, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
+    lzma_action, lzma_allocator, lzma_check, lzma_internal, lzma_ret, lzma_stream, LZMA_BUF_ERROR,
+    LZMA_GET_CHECK, LZMA_MEMLIMIT_ERROR, LZMA_MEM_ERROR, LZMA_NO_CHECK, LZMA_OK, LZMA_PROG_ERROR,
+    LZMA_SEEK_NEEDED, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
 };
 use crate::internal::common::{
-    action_index, default_supported_actions, lzma_alloc, lzma_free,
-    reserved_members_are_clear, ACTION_COUNT, LZMA_FINISH, LZMA_FULL_BARRIER, LZMA_FULL_FLUSH,
-    LZMA_RUN, LZMA_SYNC_FLUSH, LZMA_TIMED_OUT,
+    action_index, default_supported_actions, lzma_alloc, lzma_free, reserved_members_are_clear,
+    ACTION_COUNT, LZMA_FINISH, LZMA_FULL_BARRIER, LZMA_FULL_FLUSH, LZMA_RUN, LZMA_SYNC_FLUSH,
+    LZMA_TIMED_OUT,
 };
 
 pub(crate) type CodeFn = unsafe fn(
@@ -110,13 +110,26 @@ unsafe fn state_ref(strm: *const lzma_stream) -> *const StreamState {
     (*strm).internal.cast::<StreamState>()
 }
 
+pub(crate) unsafe fn current_next_coder(strm: *const lzma_stream) -> Option<NextCoder> {
+    if strm.is_null() || (*strm).internal.is_null() {
+        return None;
+    }
+
+    let state = &*state_ref(strm);
+    match state.next {
+        CoderInterface::Registered(next) => Some(next),
+        CoderInterface::Uninitialized => None,
+    }
+}
+
 pub(crate) unsafe fn lzma_strm_init(strm: *mut lzma_stream) -> lzma_ret {
     if strm.is_null() {
         return LZMA_PROG_ERROR;
     }
 
     if (*strm).internal.is_null() {
-        let raw = lzma_alloc(mem::size_of::<StreamState>(), (*strm).allocator).cast::<StreamState>();
+        let raw =
+            lzma_alloc(mem::size_of::<StreamState>(), (*strm).allocator).cast::<StreamState>();
         if raw.is_null() {
             return LZMA_MEM_ERROR;
         }
@@ -396,10 +409,7 @@ pub(crate) unsafe fn lzma_memlimit_get_impl(strm: *const lzma_stream) -> u64 {
     old_memlimit
 }
 
-pub(crate) unsafe fn lzma_memlimit_set_impl(
-    strm: *mut lzma_stream,
-    new_memlimit: u64,
-) -> lzma_ret {
+pub(crate) unsafe fn lzma_memlimit_set_impl(strm: *mut lzma_stream, new_memlimit: u64) -> lzma_ret {
     if strm.is_null() || (*strm).internal.is_null() {
         return LZMA_PROG_ERROR;
     }
@@ -479,10 +489,7 @@ mod tests {
         LZMA_OK
     }
 
-    unsafe fn install_test_coder(
-        strm: *mut lzma_stream,
-        scripted: &[(lzma_ret, usize, usize)],
-    ) {
+    unsafe fn install_test_coder(strm: *mut lzma_stream, scripted: &[(lzma_ret, usize, usize)]) {
         let coder = Box::new(TestCoder {
             scripted: scripted.iter().copied().collect(),
             progress: Some((123, 456)),

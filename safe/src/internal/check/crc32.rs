@@ -70,12 +70,8 @@ fn crc32_slice_by_8(buf: &[u8], crc: u32) -> u32 {
 
         let limit = index + ((len - index) & !7usize);
         while index < limit {
-            let block0 = u32::from_le_bytes([
-                buf[index],
-                buf[index + 1],
-                buf[index + 2],
-                buf[index + 3],
-            ]);
+            let block0 =
+                u32::from_le_bytes([buf[index], buf[index + 1], buf[index + 2], buf[index + 3]]);
             crc ^= block0;
             crc = CRC32_TABLE[7][(crc & 0xFF) as usize]
                 ^ CRC32_TABLE[6][((crc >> 8) & 0xFF) as usize]

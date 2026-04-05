@@ -50,12 +50,7 @@ pub(crate) struct FileInfoDecoder {
 }
 
 impl FileInfoDecoder {
-    unsafe fn fill_temp(
-        &mut self,
-        input: *const u8,
-        in_pos: *mut usize,
-        in_size: usize,
-    ) -> bool {
+    unsafe fn fill_temp(&mut self, input: *const u8, in_pos: *mut usize, in_size: usize) -> bool {
         let available = in_size.saturating_sub(*in_pos);
         let needed = self.temp_size.saturating_sub(self.temp_pos);
         let copy_len = available.min(needed);
@@ -106,13 +101,12 @@ impl FileInfoDecoder {
         }
 
         self.temp_pos = 0;
-        self.temp_size = if self.file_target_pos - (LZMA_STREAM_HEADER_SIZE as u64)
-            < self.temp.len() as u64
-        {
-            (self.file_target_pos - LZMA_STREAM_HEADER_SIZE as u64) as usize
-        } else {
-            self.temp.len()
-        };
+        self.temp_size =
+            if self.file_target_pos - (LZMA_STREAM_HEADER_SIZE as u64) < self.temp.len() as u64 {
+                (self.file_target_pos - LZMA_STREAM_HEADER_SIZE as u64) as usize
+            } else {
+                self.temp.len()
+            };
 
         if self.temp_size < LZMA_STREAM_HEADER_SIZE {
             return LZMA_DATA_ERROR;
@@ -315,13 +309,12 @@ unsafe fn file_info_code(
                 if let Some(decoder) = &mut coder.index_decoder {
                     decoder.end(allocator);
                 }
-                coder.index_decoder = Some(match IndexDecoderState::new(
-                    allocator,
-                    coder.memlimit - memused,
-                ) {
-                    Ok(state) => state,
-                    Err(ret) => return ret,
-                });
+                coder.index_decoder = Some(
+                    match IndexDecoderState::new(allocator, coder.memlimit - memused) {
+                        Ok(state) => state,
+                        Err(ret) => return ret,
+                    },
+                );
                 coder.index_remaining = coder.footer_flags.backward_size;
                 coder.sequence = SEQ_INDEX_DECODE;
             }
@@ -330,13 +323,8 @@ unsafe fn file_info_code(
                     let temp_ptr = coder.temp.as_ptr();
                     let temp_size = coder.temp_size;
                     let mut temp_pos = coder.temp_pos;
-                    let ret = coder.decode_index(
-                        allocator,
-                        temp_ptr,
-                        &mut temp_pos,
-                        temp_size,
-                        false,
-                    );
+                    let ret =
+                        coder.decode_index(allocator, temp_ptr, &mut temp_pos, temp_size, false);
                     coder.temp_pos = temp_pos;
                     ret
                 } else {

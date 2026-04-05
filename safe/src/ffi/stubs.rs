@@ -4,12 +4,15 @@
 use core::ffi::{c_char, c_int};
 
 use super::types::*;
-use crate::internal::{check, filter, hardware, index, preset, stream_flags, stream_state, vli};
+use crate::internal::{
+    block, check, container, filter, hardware, index, preset, stream_flags, stream_state, upstream,
+    vli,
+};
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_alone_decoder(arg0: *mut lzma_stream, arg1: u64) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::alone::alone_decoder(arg0, arg1)
 }
 
 #[no_mangle]
@@ -18,7 +21,7 @@ pub unsafe extern "C" fn lzma_alone_encoder(
     arg0: *mut lzma_stream,
     arg1: *const lzma_options_lzma,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::alone::alone_encoder(arg0, arg1)
 }
 
 #[no_mangle]
@@ -28,13 +31,13 @@ pub unsafe extern "C" fn lzma_auto_decoder(
     arg1: u64,
     arg2: u32,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::auto_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_block_buffer_bound(arg0: usize) -> usize {
-    0
+    block::block_buffer_bound(arg0)
 }
 
 #[no_mangle]
@@ -49,7 +52,7 @@ pub unsafe extern "C" fn lzma_block_buffer_decode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_buffer_decode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
@@ -63,7 +66,7 @@ pub unsafe extern "C" fn lzma_block_buffer_encode(
     arg5: *mut usize,
     arg6: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }
 
 #[no_mangle]
@@ -72,7 +75,7 @@ pub unsafe extern "C" fn lzma_block_compressed_size(
     arg0: *mut lzma_block,
     arg1: lzma_vli,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_compressed_size(arg0, arg1)
 }
 
 #[no_mangle]
@@ -81,7 +84,7 @@ pub unsafe extern "C" fn lzma_block_decoder(
     arg0: *mut lzma_stream,
     arg1: *mut lzma_block,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_decoder(arg0, arg1)
 }
 
 #[no_mangle]
@@ -90,7 +93,7 @@ pub unsafe extern "C" fn lzma_block_encoder(
     arg0: *mut lzma_stream,
     arg1: *mut lzma_block,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_encoder(arg0, arg1)
 }
 
 #[no_mangle]
@@ -100,7 +103,7 @@ pub unsafe extern "C" fn lzma_block_header_decode(
     arg1: *const lzma_allocator,
     arg2: *const u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_header_decode(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -109,25 +112,25 @@ pub unsafe extern "C" fn lzma_block_header_encode(
     arg0: *const lzma_block,
     arg1: *mut u8,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_header_encode(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_block_header_size(arg0: *mut lzma_block) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_header_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_block_total_size(arg0: *const lzma_block) -> lzma_vli {
-    0
+    block::block_total_size(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_block_unpadded_size(arg0: *const lzma_block) -> lzma_vli {
-    0
+    block::block_unpadded_size(arg0)
 }
 
 #[no_mangle]
@@ -184,13 +187,13 @@ pub unsafe extern "C" fn lzma_easy_buffer_encode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::easy_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_easy_decoder_memusage(arg0: u32) -> u64 {
-    u64::MAX
+    upstream::easy_decoder_memusage(arg0)
 }
 
 #[no_mangle]
@@ -200,13 +203,13 @@ pub unsafe extern "C" fn lzma_easy_encoder(
     arg1: u32,
     arg2: lzma_check,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::easy_encoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_easy_encoder_memusage(arg0: u32) -> u64 {
-    u64::MAX
+    upstream::easy_encoder_memusage(arg0)
 }
 
 #[no_mangle]
@@ -275,7 +278,7 @@ pub unsafe extern "C" fn lzma_filters_update(
     arg0: *mut lzma_stream,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::filters_update(arg0, arg1)
 }
 
 #[no_mangle]
@@ -605,7 +608,7 @@ pub unsafe extern "C" fn lzma_raw_buffer_decode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::raw_buffer_decode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
@@ -619,7 +622,7 @@ pub unsafe extern "C" fn lzma_raw_buffer_encode(
     arg5: *mut usize,
     arg6: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::raw_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }
 
 #[no_mangle]
@@ -628,13 +631,13 @@ pub unsafe extern "C" fn lzma_raw_decoder(
     arg0: *mut lzma_stream,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::raw_decoder(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_raw_decoder_memusage(arg0: *const lzma_filter) -> u64 {
-    u64::MAX
+    upstream::raw_decoder_memusage(arg0)
 }
 
 #[no_mangle]
@@ -643,19 +646,19 @@ pub unsafe extern "C" fn lzma_raw_encoder(
     arg0: *mut lzma_stream,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::raw_encoder(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_raw_encoder_memusage(arg0: *const lzma_filter) -> u64 {
-    u64::MAX
+    upstream::raw_encoder_memusage(arg0)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_stream_buffer_bound(arg0: usize) -> usize {
-    0
+    upstream::stream_buffer_bound(arg0)
 }
 
 #[no_mangle]
@@ -671,7 +674,7 @@ pub unsafe extern "C" fn lzma_stream_buffer_decode(
     arg7: *mut usize,
     arg8: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::stream_buffer_decode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 }
 
 #[no_mangle]
@@ -686,7 +689,7 @@ pub unsafe extern "C" fn lzma_stream_buffer_encode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::stream_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
@@ -696,7 +699,7 @@ pub unsafe extern "C" fn lzma_stream_decoder(
     arg1: u64,
     arg2: u32,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::stream_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -706,7 +709,7 @@ pub unsafe extern "C" fn lzma_stream_encoder(
     arg1: *const lzma_filter,
     arg2: lzma_check,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::stream_encoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -806,7 +809,7 @@ pub unsafe extern "C" fn lzma_block_uncomp_encode(
     arg4: *mut usize,
     arg5: usize,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    block::block_uncomp_encode(arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 #[no_mangle]
@@ -860,7 +863,7 @@ pub unsafe extern "C" fn lzma_lzip_decoder(
     arg1: u64,
     arg2: u32,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::lzip::lzip_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -872,7 +875,7 @@ pub unsafe extern "C" fn lzma_microlzma_decoder(
     arg3: lzma_bool,
     arg4: u32,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::microlzma::microlzma_decoder(arg0, arg1, arg2, arg3, arg4)
 }
 
 #[no_mangle]
@@ -881,7 +884,7 @@ pub unsafe extern "C" fn lzma_microlzma_encoder(
     arg0: *mut lzma_stream,
     arg1: *const lzma_options_lzma,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::microlzma::microlzma_encoder(arg0, arg1)
 }
 
 #[no_mangle]

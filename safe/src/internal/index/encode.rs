@@ -3,8 +3,8 @@ use core::mem::size_of;
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_action, lzma_allocator, lzma_index, lzma_ret, lzma_stream, LZMA_BUF_ERROR,
-    LZMA_MEM_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
+    lzma_action, lzma_allocator, lzma_index, lzma_ret, lzma_stream, LZMA_BUF_ERROR, LZMA_MEM_ERROR,
+    LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
 };
 use crate::internal::check::crc32;
 use crate::internal::common::{default_supported_actions, lzma_alloc, lzma_free};
@@ -27,7 +27,10 @@ fn push_vli(buffer: &mut Vec<u8>, mut value: u64) {
 }
 
 fn encode_index_bytes(index: &Index) -> Vec<u8> {
-    let mut out = Vec::with_capacity(index_size_from_counts(index.record_count, index.index_list_size) as usize);
+    let mut out = Vec::with_capacity(index_size_from_counts(
+        index.record_count,
+        index.index_list_size,
+    ) as usize);
     out.push(INDEX_INDICATOR);
     push_vli(&mut out, index.record_count);
 
@@ -122,8 +125,8 @@ pub(crate) unsafe fn index_encoder(strm: *mut lzma_stream, index: *const lzma_in
     }
 
     let bytes = encode_index_bytes(index_ref(index));
-    let raw = lzma_alloc(size_of::<IndexEncoderStream>(), (*strm).allocator)
-        .cast::<IndexEncoderStream>();
+    let raw =
+        lzma_alloc(size_of::<IndexEncoderStream>(), (*strm).allocator).cast::<IndexEncoderStream>();
     if raw.is_null() {
         return LZMA_MEM_ERROR;
     }
@@ -181,7 +184,10 @@ mod tests {
     fn encoder_writes_expected_empty_index() {
         let index = Index::new();
         let encoded = encode_index_bytes(&index);
-        assert_eq!(encoded, vec![0x00, 0x00, 0x00, 0x00, 0x1C, 0xDF, 0x44, 0x21]);
+        assert_eq!(
+            encoded,
+            vec![0x00, 0x00, 0x00, 0x00, 0x1C, 0xDF, 0x44, 0x21]
+        );
     }
 
     #[test]

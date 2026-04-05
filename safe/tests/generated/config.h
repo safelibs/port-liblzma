@@ -172,7 +172,7 @@
 #define HAVE_LIMITS_H 1
 
 /* Define to 1 if .lz (lzip) decompression support is enabled. */
-/* #undef HAVE_LZIP_DECODER */
+#define HAVE_LZIP_DECODER 1
 
 /* Define to 1 if mbrtowc and mbstate_t are properly declared. */
 #define HAVE_MBRTOWC 1
@@ -601,5 +601,4 @@
    pointer, if such a type exists, and if the system does not define it. */
 /* #undef uintptr_t */
 
-/* Phase 03: filter metadata, properties, string conversion, and stream flag helpers are implemented. */
-/* Keep lzip disabled until the corresponding decoder surface exists in Rust. */
+/* Phase 05: low-level block/raw helpers and special container codecs are enabled. */

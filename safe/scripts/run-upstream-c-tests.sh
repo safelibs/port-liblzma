@@ -96,6 +96,6 @@ for src in "${test_sources[@]}"; do
     -lpthread \
     -o "$exe"
   if [[ "$mode" == "run" ]]; then
-    "$exe"
+    srcdir="$safe_dir/tests/upstream" "$exe"
   fi
 done
