@@ -93,14 +93,14 @@ check_PROGRAMS = create_compress_files$(EXEEXT) test_check$(EXEEXT) \
 	test_block_header$(EXEEXT) test_index$(EXEEXT) \
 	test_index_hash$(EXEEXT) test_bcj_exact_size$(EXEEXT) \
 	test_memlimit$(EXEEXT) test_lzip_decoder$(EXEEXT) \
-	test_vli$(EXEEXT)
+	test_public_api$(EXEEXT) test_vli$(EXEEXT)
 TESTS = test_check$(EXEEXT) test_hardware$(EXEEXT) \
 	test_stream_flags$(EXEEXT) test_filter_flags$(EXEEXT) \
 	test_filter_str$(EXEEXT) test_block_header$(EXEEXT) \
 	test_index$(EXEEXT) test_index_hash$(EXEEXT) \
 	test_bcj_exact_size$(EXEEXT) test_memlimit$(EXEEXT) \
-	test_lzip_decoder$(EXEEXT) test_vli$(EXEEXT) test_files.sh \
-	test_compress_prepared_bcj_sparc \
+	test_lzip_decoder$(EXEEXT) test_public_api$(EXEEXT) \
+	test_vli$(EXEEXT) test_files.sh test_compress_prepared_bcj_sparc \
 	test_compress_prepared_bcj_x86 test_compress_generated_abc \
 	test_compress_generated_random test_compress_generated_text \
 	$(am__append_1)
@@ -191,6 +191,11 @@ test_memlimit_OBJECTS = test_memlimit.$(OBJEXT)
 test_memlimit_LDADD = $(LDADD)
 test_memlimit_DEPENDENCIES = $(top_builddir)/src/liblzma/liblzma.la \
 	$(am__DEPENDENCIES_1)
+test_public_api_SOURCES = test_public_api.c
+test_public_api_OBJECTS = test_public_api.$(OBJEXT)
+test_public_api_LDADD = $(LDADD)
+test_public_api_DEPENDENCIES = $(top_builddir)/src/liblzma/liblzma.la \
+	$(am__DEPENDENCIES_1)
 test_stream_flags_SOURCES = test_stream_flags.c
 test_stream_flags_OBJECTS = test_stream_flags.$(OBJEXT)
 test_stream_flags_LDADD = $(LDADD)
@@ -223,6 +228,7 @@ am__depfiles_remade = ./$(DEPDIR)/create_compress_files.Po \
 	./$(DEPDIR)/test_filter_str.Po ./$(DEPDIR)/test_hardware.Po \
 	./$(DEPDIR)/test_index.Po ./$(DEPDIR)/test_index_hash.Po \
 	./$(DEPDIR)/test_lzip_decoder.Po ./$(DEPDIR)/test_memlimit.Po \
+	./$(DEPDIR)/test_public_api.Po \
 	./$(DEPDIR)/test_stream_flags.Po ./$(DEPDIR)/test_vli.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -247,11 +253,13 @@ SOURCES = create_compress_files.c test_bcj_exact_size.c \
 	test_block_header.c test_check.c test_filter_flags.c \
 	test_filter_str.c test_hardware.c test_index.c \
 	test_index_hash.c test_lzip_decoder.c test_memlimit.c \
+	test_public_api.c \
 	test_stream_flags.c test_vli.c
 DIST_SOURCES = create_compress_files.c test_bcj_exact_size.c \
 	test_block_header.c test_check.c test_filter_flags.c \
 	test_filter_str.c test_hardware.c test_index.c \
 	test_index_hash.c test_lzip_decoder.c test_memlimit.c \
+	test_public_api.c \
 	test_stream_flags.c test_vli.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -750,6 +758,10 @@ test_memlimit$(EXEEXT): $(test_memlimit_OBJECTS) $(test_memlimit_DEPENDENCIES) $
 	@rm -f test_memlimit$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_memlimit_OBJECTS) $(test_memlimit_LDADD) $(LIBS)
 
+test_public_api$(EXEEXT): $(test_public_api_OBJECTS) $(test_public_api_DEPENDENCIES) $(EXTRA_test_public_api_DEPENDENCIES) 
+	@rm -f test_public_api$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_public_api_OBJECTS) $(test_public_api_LDADD) $(LIBS)
+
 test_stream_flags$(EXEEXT): $(test_stream_flags_OBJECTS) $(test_stream_flags_DEPENDENCIES) $(EXTRA_test_stream_flags_DEPENDENCIES) 
 	@rm -f test_stream_flags$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_stream_flags_OBJECTS) $(test_stream_flags_LDADD) $(LIBS)
@@ -775,6 +787,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_index_hash.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_lzip_decoder.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_memlimit.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_public_api.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_stream_flags.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_vli.Po@am__quote@ # am--include-marker
 
@@ -1074,6 +1087,13 @@ test_memlimit.log: test_memlimit$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_public_api.log: test_public_api$(EXEEXT)
+	@p='test_public_api$(EXEEXT)'; \
+	b='test_public_api'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 test_lzip_decoder.log: test_lzip_decoder$(EXEEXT)
 	@p='test_lzip_decoder$(EXEEXT)'; \
 	b='test_lzip_decoder'; \
@@ -1240,6 +1260,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/test_index_hash.Po
 	-rm -f ./$(DEPDIR)/test_lzip_decoder.Po
 	-rm -f ./$(DEPDIR)/test_memlimit.Po
+	-rm -f ./$(DEPDIR)/test_public_api.Po
 	-rm -f ./$(DEPDIR)/test_stream_flags.Po
 	-rm -f ./$(DEPDIR)/test_vli.Po
 	-rm -f Makefile
@@ -1298,6 +1319,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/test_index_hash.Po
 	-rm -f ./$(DEPDIR)/test_lzip_decoder.Po
 	-rm -f ./$(DEPDIR)/test_memlimit.Po
+	-rm -f ./$(DEPDIR)/test_public_api.Po
 	-rm -f ./$(DEPDIR)/test_stream_flags.Po
 	-rm -f ./$(DEPDIR)/test_vli.Po
 	-rm -f Makefile
