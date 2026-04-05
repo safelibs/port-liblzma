@@ -1354,9 +1354,7 @@ if(BUILD_TESTING)
         add_executable("${TEST}" "tests/${TEST}.c")
 
         target_include_directories("${TEST}" PRIVATE
-            src/common
             src/liblzma/api
-            src/liblzma
         )
 
         target_link_libraries("${TEST}" PRIVATE liblzma)

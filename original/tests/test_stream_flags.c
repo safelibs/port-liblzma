@@ -14,13 +14,11 @@
 #include "tests.h"
 
 
-// Size of the Stream Flags field
-// (taken from src/liblzma/common/stream_flags_common.h)
+// Size of the Stream Flags field in the .xz stream format.
 #define XZ_STREAM_FLAGS_SIZE 2
 
 #ifdef HAVE_ENCODERS
-// Header and footer magic bytes for .xz file format
-// (taken from src/liblzma/common/stream_flags_common.c)
+// Header and footer magic bytes defined by the .xz stream format.
 static const uint8_t xz_header_magic[6]
 		= { 0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00 };
 static const uint8_t xz_footer_magic[2] = { 0x59, 0x5A };

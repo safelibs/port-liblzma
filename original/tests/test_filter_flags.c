@@ -13,12 +13,6 @@
 
 #include "tests.h"
 
-// FIXME: This is from src/liblzma/common/common.h but it cannot be
-// included here. This constant is needed in only a few files, perhaps
-// move it to some other internal header or create a new one?
-#define LZMA_FILTER_RESERVED_START (LZMA_VLI_C(1) << 62)
-
-
 #if defined(HAVE_ENCODERS)
 // No tests are run without encoders, so init the global filters
 // only when the encoders are enabled.
@@ -127,9 +121,6 @@ test_lzma_filter_flags_size(void)
 	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
 			LZMA_OPTIONS_ERROR);
 	bad_filter.id = LZMA_VLI_MAX;
-	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
-			LZMA_PROG_ERROR);
-	bad_filter.id = LZMA_FILTER_RESERVED_START;
 	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
 			LZMA_PROG_ERROR);
 #endif
@@ -258,7 +249,7 @@ test_lzma_filter_flags_encode(void)
 	}
 
 	// Test expected failing cases
-	lzma_filter bad_filter = { LZMA_FILTER_RESERVED_START, NULL };
+	lzma_filter bad_filter = { LZMA_VLI_MAX + 1, NULL };
 	size_t out_pos = 0;
 	size_t out_size = LZMA_BLOCK_HEADER_SIZE_MAX;
 	uint8_t out[LZMA_BLOCK_HEADER_SIZE_MAX];
@@ -430,24 +421,10 @@ test_lzma_filter_flags_decode(void)
 	uint8_t bad_encoded_filter[LZMA_BLOCK_HEADER_SIZE_MAX];
 	lzma_filter bad_filter;
 
-	// Filter ID outside of valid range
-	lzma_vli bad_filter_id = LZMA_FILTER_RESERVED_START;
+	// Invalid Filter ID
+	lzma_vli bad_filter_id = 2;
 	size_t bad_encoded_out_pos = 0;
 	size_t in_pos = 0;
-
-	assert_lzma_ret(lzma_vli_encode(bad_filter_id, NULL,
-			bad_encoded_filter, &bad_encoded_out_pos,
-			LZMA_BLOCK_HEADER_SIZE_MAX), LZMA_OK);
-
-	assert_lzma_ret(lzma_filter_flags_decode(&bad_filter, NULL,
-			bad_encoded_filter, &in_pos,
-			LZMA_BLOCK_HEADER_SIZE_MAX), LZMA_DATA_ERROR);
-
-	bad_encoded_out_pos = 0;
-	in_pos = 0;
-
-	// Invalid Filter ID
-	bad_filter_id = 2;
 	bad_encoded_out_pos = 0;
 	in_pos = 0;
 

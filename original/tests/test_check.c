@@ -12,7 +12,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "tests.h"
-#include "mythread.h"
 
 
 // These must be specified as numbers so that the test works on EBCDIC
@@ -267,7 +266,7 @@ test_lzma_get_check_st(void)
 static void
 test_lzma_get_check_mt(void)
 {
-#ifndef MYTHREAD_ENABLED
+#if !TUKTEST_THREADS_ENABLED
 	assert_skip("Threading support disabled");
 #elif !defined(HAVE_DECODERS)
 	assert_skip("Decoder support disabled");

@@ -13,10 +13,63 @@
 #ifndef LZMA_TESTS_H
 #define LZMA_TESTS_H
 
-#include "sysdefs.h"
-#include "tuklib_integer.h"
+#ifdef HAVE_CONFIG_H
+#	include <config.h>
+#endif
+
+#include <stdbool.h>
+#include <string.h>
+
 #include "lzma.h"
 #include "tuktest.h"
+
+
+#define memzero(s, n) memset(s, 0, n)
+
+#ifndef ARRAY_SIZE
+#	define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+#endif
+
+
+static inline uint32_t
+read32le(const uint8_t *buf)
+{
+	return (uint32_t)buf[0]
+			| ((uint32_t)buf[1] << 8)
+			| ((uint32_t)buf[2] << 16)
+			| ((uint32_t)buf[3] << 24);
+}
+
+
+static inline void
+write32le(uint8_t *buf, uint32_t num)
+{
+	buf[0] = (uint8_t)(num);
+	buf[1] = (uint8_t)(num >> 8);
+	buf[2] = (uint8_t)(num >> 16);
+	buf[3] = (uint8_t)(num >> 24);
+}
+
+
+#if defined(MYTHREAD_POSIX) || defined(MYTHREAD_WIN95) \
+		|| defined(MYTHREAD_VISTA)
+#	define TUKTEST_THREADS_ENABLED 1
+#else
+#	define TUKTEST_THREADS_ENABLED 0
+#endif
+
+
+// These come from the .xz file format, not liblzma's internal headers.
+#define TUKTEST_UNPADDED_SIZE_MIN LZMA_VLI_C(5)
+#define TUKTEST_UNPADDED_SIZE_MAX (LZMA_VLI_MAX & ~LZMA_VLI_C(3))
+#define TUKTEST_INDEX_INDICATOR 0
+
+
+static inline lzma_vli
+tuktest_vli_ceil4(lzma_vli vli)
+{
+	return (vli + 3) & ~LZMA_VLI_C(3);
+}
 
 
 // Invalid value for the lzma_check enumeration. This must be positive

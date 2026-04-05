@@ -16,12 +16,6 @@
 
 #include "tests.h"
 
-// liblzma internal header file needed for:
-// UNPADDED_SIZE_MIN
-// UNPADDED_SIZE_MAX
-// vli_ceil4
-#include "common/index.h"
-
 
 #define MEMLIMIT (UINT64_C(1) << 20)
 
@@ -89,7 +83,7 @@ test_lzma_index_memused(void)
 	// Append small Blocks and then test again (should pass).
 	for (lzma_vli i = 0; i < 10; i++)
 		assert_lzma_ret(lzma_index_append(idx, NULL,
-				UNPADDED_SIZE_MIN, 1), LZMA_OK);
+				TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	assert_uint(lzma_index_memused(idx), <, UINT64_MAX);
 
@@ -105,7 +99,7 @@ test_lzma_index_append(void)
 	// other tests.
 
 	// First test with NULL lzma_index
-	assert_lzma_ret(lzma_index_append(NULL, NULL, UNPADDED_SIZE_MIN,
+	assert_lzma_ret(lzma_index_append(NULL, NULL, TUKTEST_UNPADDED_SIZE_MIN,
 			1), LZMA_PROG_ERROR);
 
 	lzma_index *idx = lzma_index_init(NULL);
@@ -113,23 +107,23 @@ test_lzma_index_append(void)
 
 	// Test with invalid Unpadded Size
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN - 1, 1), LZMA_PROG_ERROR);
+			TUKTEST_UNPADDED_SIZE_MIN - 1, 1), LZMA_PROG_ERROR);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MAX + 1, 1), LZMA_PROG_ERROR);
+			TUKTEST_UNPADDED_SIZE_MAX + 1, 1), LZMA_PROG_ERROR);
 
 	// Test with invalid Uncompressed Size
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MAX, LZMA_VLI_MAX + 1),
+			TUKTEST_UNPADDED_SIZE_MAX, LZMA_VLI_MAX + 1),
 			LZMA_PROG_ERROR);
 
 	// Test expected successful Block appends
-	assert_lzma_ret(lzma_index_append(idx, NULL, UNPADDED_SIZE_MIN,
+	assert_lzma_ret(lzma_index_append(idx, NULL, TUKTEST_UNPADDED_SIZE_MIN,
 			1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 2,
+			TUKTEST_UNPADDED_SIZE_MIN * 2,
 			2), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 3,
+			TUKTEST_UNPADDED_SIZE_MIN * 3,
 			3), LZMA_OK);
 
 	lzma_index_end(idx, NULL);
@@ -146,7 +140,7 @@ test_lzma_index_append(void)
 	// for both streams. This allows us to maximize the unpadded sum
 	// during the lzma_index_append() call after the indexes have been
 	// concatenated.
-	assert_lzma_ret(lzma_index_append(idx, NULL, UNPADDED_SIZE_MAX
+	assert_lzma_ret(lzma_index_append(idx, NULL, TUKTEST_UNPADDED_SIZE_MAX
 			- ((4 * LZMA_STREAM_HEADER_SIZE) + 24), 1), LZMA_OK);
 
 	lzma_index *second = lzma_index_init(NULL);
@@ -154,7 +148,7 @@ test_lzma_index_append(void)
 
 	assert_lzma_ret(lzma_index_cat(second, idx, NULL), LZMA_OK);
 
-	assert_lzma_ret(lzma_index_append(second, NULL, UNPADDED_SIZE_MAX, 1),
+	assert_lzma_ret(lzma_index_append(second, NULL, TUKTEST_UNPADDED_SIZE_MAX, 1),
 			LZMA_DATA_ERROR);
 
 	lzma_index_end(second, NULL);
@@ -164,9 +158,9 @@ test_lzma_index_append(void)
 	idx = lzma_index_init(NULL);
 
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, LZMA_VLI_MAX), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, LZMA_VLI_MAX), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_DATA_ERROR);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_DATA_ERROR);
 
 	lzma_index_end(idx, NULL);
 
@@ -342,7 +336,7 @@ test_lzma_index_stream_count(void)
 	assert_uint_eq(lzma_index_stream_count(idx), 1);
 
 	// Appending Blocks should not change the Stream count value
-	assert_lzma_ret(lzma_index_append(idx, NULL, UNPADDED_SIZE_MIN,
+	assert_lzma_ret(lzma_index_append(idx, NULL, TUKTEST_UNPADDED_SIZE_MIN,
 			1), LZMA_OK);
 
 	assert_uint_eq(lzma_index_stream_count(idx), 1);
@@ -370,7 +364,7 @@ test_lzma_index_block_count(void)
 	const uint32_t iterations = 0x1000;
 	for (uint32_t i = 0; i < iterations; i++) {
 		assert_lzma_ret(lzma_index_append(idx, NULL,
-				UNPADDED_SIZE_MIN, 1), LZMA_OK);
+				TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 		assert_uint_eq(lzma_index_block_count(idx), i + 1);
 	}
 
@@ -379,11 +373,11 @@ test_lzma_index_block_count(void)
 	assert_true(second != NULL);
 
 	assert_lzma_ret(lzma_index_append(second, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(second, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(second, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	assert_uint_eq(lzma_index_block_count(second), 3);
 
@@ -393,7 +387,7 @@ test_lzma_index_block_count(void)
 	assert_uint_eq(lzma_index_block_count(idx), iterations + 3);
 
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	assert_uint_eq(lzma_index_block_count(idx), iterations + 4);
 
@@ -417,7 +411,7 @@ test_lzma_index_size(void)
 	assert_uint_eq(lzma_index_size(idx), 8);
 
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	// New size should be:
 	// 1 byte Index Indicator
@@ -686,7 +680,7 @@ test_lzma_index_iter_rewind(void)
 	// the LZMA_INDEX_ITER_BLOCK mode.
 	for (uint32_t i = 0; i < 3; i++) {
 		assert_lzma_ret(lzma_index_append(first, NULL,
-				UNPADDED_SIZE_MIN, 1), LZMA_OK);
+				TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 		assert_false(lzma_index_iter_next(&iter,
 				LZMA_INDEX_ITER_BLOCK));
 		assert_uint_eq(iter.block.number_in_file, i + 1);
@@ -748,11 +742,11 @@ test_lzma_index_iter_next(void)
 
 	// Test iterating over Blocks
 	assert_lzma_ret(lzma_index_append(first, NULL,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(first, NULL,
-			UNPADDED_SIZE_MIN * 2, 10), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 2, 10), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(first, NULL,
-			UNPADDED_SIZE_MIN * 3, 100), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 3, 100), LZMA_OK);
 
 	// For Blocks, need to verify:
 	// - number_in_file (overall Block number)
@@ -778,8 +772,9 @@ test_lzma_index_iter_next(void)
 	assert_uint_eq(iter.block.compressed_stream_offset,
 			LZMA_STREAM_HEADER_SIZE);
 	assert_uint_eq(iter.block.uncompressed_stream_offset, 0);
-	assert_uint_eq(iter.block.unpadded_size, UNPADDED_SIZE_MIN);
-	assert_uint_eq(iter.block.total_size, vli_ceil4(UNPADDED_SIZE_MIN));
+	assert_uint_eq(iter.block.unpadded_size, TUKTEST_UNPADDED_SIZE_MIN);
+	assert_uint_eq(iter.block.total_size,
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN));
 
 	assert_false(lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK));
 
@@ -787,15 +782,16 @@ test_lzma_index_iter_next(void)
 	assert_uint_eq(iter.block.number_in_file, 2);
 	assert_uint_eq(iter.block.compressed_file_offset,
 			LZMA_STREAM_HEADER_SIZE +
-			vli_ceil4(UNPADDED_SIZE_MIN));
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN));
 	assert_uint_eq(iter.block.uncompressed_file_offset, 1);
 	assert_uint_eq(iter.block.number_in_stream, 2);
 	assert_uint_eq(iter.block.compressed_stream_offset,
 			LZMA_STREAM_HEADER_SIZE +
-			vli_ceil4(UNPADDED_SIZE_MIN));
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN));
 	assert_uint_eq(iter.block.uncompressed_stream_offset, 1);
-	assert_uint_eq(iter.block.unpadded_size, UNPADDED_SIZE_MIN * 2);
-	assert_uint_eq(iter.block.total_size, vli_ceil4(UNPADDED_SIZE_MIN * 2));
+	assert_uint_eq(iter.block.unpadded_size, TUKTEST_UNPADDED_SIZE_MIN * 2);
+	assert_uint_eq(iter.block.total_size,
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 2));
 
 	assert_false(lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK));
 
@@ -803,27 +799,27 @@ test_lzma_index_iter_next(void)
 	assert_uint_eq(iter.block.number_in_file, 3);
 	assert_uint_eq(iter.block.compressed_file_offset,
 			LZMA_STREAM_HEADER_SIZE +
-			vli_ceil4(UNPADDED_SIZE_MIN) +
-			vli_ceil4(UNPADDED_SIZE_MIN * 2));
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN) +
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 2));
 	assert_uint_eq(iter.block.uncompressed_file_offset, 11);
 	assert_uint_eq(iter.block.number_in_stream, 3);
 	assert_uint_eq(iter.block.compressed_stream_offset,
 			LZMA_STREAM_HEADER_SIZE +
-			vli_ceil4(UNPADDED_SIZE_MIN) +
-			vli_ceil4(UNPADDED_SIZE_MIN * 2));
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN) +
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 2));
 	assert_uint_eq(iter.block.uncompressed_stream_offset, 11);
-	assert_uint_eq(iter.block.unpadded_size, UNPADDED_SIZE_MIN * 3);
+	assert_uint_eq(iter.block.unpadded_size, TUKTEST_UNPADDED_SIZE_MIN * 3);
 	assert_uint_eq(iter.block.total_size,
-			vli_ceil4(UNPADDED_SIZE_MIN * 3));
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 3));
 
 	// Only three Blocks were added, so this should return true
 	assert_true(lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK));
 
 	const lzma_vli second_stream_compressed_start =
 			LZMA_STREAM_HEADER_SIZE * 2 +
-			vli_ceil4(UNPADDED_SIZE_MIN) +
-			vli_ceil4(UNPADDED_SIZE_MIN * 2) +
-			vli_ceil4(UNPADDED_SIZE_MIN * 3) +
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN) +
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 2) +
+			tuktest_vli_ceil4(TUKTEST_UNPADDED_SIZE_MIN * 3) +
 			lzma_index_size(first);
 	const lzma_vli second_stream_uncompressed_start = 1 + 10 + 100;
 
@@ -1173,9 +1169,9 @@ test_lzma_index_cat(void)
 
 	// Check for uncompressed size overflow
 	assert_lzma_ret(lzma_index_append(dest, NULL,
-			(UNPADDED_SIZE_MAX / 2) + 1, 1), LZMA_OK);
+			(TUKTEST_UNPADDED_SIZE_MAX / 2) + 1, 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(src, NULL,
-			(UNPADDED_SIZE_MAX / 2) + 1, 1), LZMA_OK);
+			(TUKTEST_UNPADDED_SIZE_MAX / 2) + 1, 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_cat(dest, src, NULL), LZMA_DATA_ERROR);
 
 	// Check for compressed size overflow
@@ -1189,9 +1185,9 @@ test_lzma_index_cat(void)
 	assert_true(src != NULL);
 
 	assert_lzma_ret(lzma_index_append(dest, NULL,
-			UNPADDED_SIZE_MIN, LZMA_VLI_MAX - 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, LZMA_VLI_MAX - 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(src, NULL,
-			UNPADDED_SIZE_MIN, LZMA_VLI_MAX - 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, LZMA_VLI_MAX - 1), LZMA_OK);
 	assert_lzma_ret(lzma_index_cat(dest, src, NULL), LZMA_DATA_ERROR);
 
 	lzma_index_end(dest, NULL);
@@ -1291,11 +1287,11 @@ test_lzma_index_dup(void)
 	// liblzma: Fix a memory leak in error path of lzma_index_dup().
 	// Use Valgrind to see that there are no leaks.
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 10), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 10), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
 
 	assert_true(lzma_index_dup(idx, &test_index_dup_alloc) == NULL);
 
@@ -1309,11 +1305,11 @@ test_lzma_index_dup(void)
 	assert_true(third != NULL);
 
 	assert_lzma_ret(lzma_index_append(third, NULL,
-			UNPADDED_SIZE_MIN * 10, 40), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 10, 40), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(third, NULL,
-			UNPADDED_SIZE_MIN * 20, 400), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 20, 400), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(third, NULL,
-			UNPADDED_SIZE_MIN * 30, 4000), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 30, 4000), LZMA_OK);
 
 	assert_lzma_ret(lzma_index_cat(idx, second, NULL), LZMA_OK);
 	assert_lzma_ret(lzma_index_cat(idx, third, NULL), LZMA_OK);
@@ -1337,7 +1333,7 @@ verify_index_buffer(const lzma_index *idx, const uint8_t *buffer,
 	size_t buffer_pos = 0;
 
 	// Verify Index Indicator
-	assert_uint_eq(buffer[buffer_pos++], 0);
+	assert_uint_eq(buffer[buffer_pos++], TUKTEST_INDEX_INDICATOR);
 
 	// Get Number of Records
 	lzma_vli number_of_records = 0;
@@ -1408,11 +1404,11 @@ test_lzma_index_encoder(void)
 
 	// Append three small Blocks
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 10), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 10), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
 
 	// Encode this lzma_index into a buffer
 	size_t buffer_size = get_index_size(idx);
@@ -1436,7 +1432,7 @@ test_lzma_index_encoder(void)
 
 	// Include 1 Block
 	assert_lzma_ret(lzma_index_append(second, NULL,
-			UNPADDED_SIZE_MIN * 4, 20), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 4, 20), LZMA_OK);
 
 	// Include Stream Padding
 	assert_lzma_ret(lzma_index_stream_padding(second, 16), LZMA_OK);
@@ -1586,11 +1582,11 @@ test_lzma_index_buffer_encode(void)
 	assert_true(idx != NULL);
 
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN, 10), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 10), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 2, 100), LZMA_OK);
 	assert_lzma_ret(lzma_index_append(idx, NULL,
-			UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN * 3, 1000), LZMA_OK);
 
 	size_t buffer_size = get_index_size(idx);
 	uint8_t *buffer = tuktest_malloc(buffer_size);

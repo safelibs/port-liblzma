@@ -13,8 +13,15 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "sysdefs.h"
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+#ifndef ARRAY_SIZE
+#	define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+#endif
 
 
 // If a command-line argument was given, only create the file if its

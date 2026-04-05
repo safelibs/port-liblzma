@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
 /// \file       test_index_hash.c
-/// \brief      Tests src/liblzma/common/index_hash.c API functions
+/// \brief      Tests Index hash public API functions
 ///
 /// \note       No test included for lzma_index_hash_end since it
 ///             would be trivial unless tested for memory leaks
@@ -15,10 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "tests.h"
-
-// Needed for UNPADDED_SIZE_MIN and UNPADDED_SIZE_MAX macro definitions
-// and index_size and vli_ceil4 helper functions
-#include "common/index.h"
 
 
 static void
@@ -55,34 +51,34 @@ test_lzma_index_hash_append(void)
 			LZMA_PROG_ERROR);
 
 	// Test NULL index_hash
-	assert_lzma_ret(lzma_index_hash_append(NULL, UNPADDED_SIZE_MIN,
+	assert_lzma_ret(lzma_index_hash_append(NULL, TUKTEST_UNPADDED_SIZE_MIN,
 			LZMA_VLI_MAX), LZMA_PROG_ERROR);
 
 	// Test with invalid Unpadded Size
 	lzma_index_hash *index_hash = lzma_index_hash_init(NULL, NULL);
 	assert_true(index_hash != NULL);
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN - 1, LZMA_VLI_MAX),
+			TUKTEST_UNPADDED_SIZE_MIN - 1, LZMA_VLI_MAX),
 			LZMA_PROG_ERROR);
 
 	// Test with invalid Uncompressed Size
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN, LZMA_VLI_MAX + 1),
+			TUKTEST_UNPADDED_SIZE_MIN, LZMA_VLI_MAX + 1),
 			LZMA_PROG_ERROR);
 
 	// First append a Record describing a small Block.
 	// This should succeed.
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	// Append another small Record.
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	// Append a Record that would cause the compressed size to grow
 	// too big
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MAX, 1), LZMA_DATA_ERROR);
+			TUKTEST_UNPADDED_SIZE_MAX, 1), LZMA_DATA_ERROR);
 
 	lzma_index_hash_end(index_hash, NULL);
 #endif
@@ -114,7 +110,7 @@ generate_index(uint8_t *buf, const lzma_vli *unpadded_sizes,
 	size_t out_pos = 0;
 
 	// First set Index Indicator
-	buf[out_pos++] = INDEX_INDICATOR;
+	buf[out_pos++] = TUKTEST_INDEX_INDICATOR;
 
 	// Next write out Number of Records
 	assert_lzma_ret(lzma_vli_encode(block_count, &in_pos, buf,
@@ -133,7 +129,7 @@ generate_index(uint8_t *buf, const lzma_vli *unpadded_sizes,
 	}
 
 	// Add Index Padding
-	lzma_vli rounded_out_pos = vli_ceil4(out_pos);
+	lzma_vli rounded_out_pos = tuktest_vli_ceil4(out_pos);
 	memzero(buf + out_pos, rounded_out_pos - out_pos);
 	out_pos = rounded_out_pos;
 
@@ -159,7 +155,7 @@ test_lzma_index_hash_decode(void)
 
 	// Six valid values for the Unpadded Size fields in an Index
 	const lzma_vli unpadded_sizes[6] = {
-		UNPADDED_SIZE_MIN,
+		TUKTEST_UNPADDED_SIZE_MIN,
 		1000,
 		4000,
 		8000,
@@ -328,7 +324,7 @@ test_lzma_index_hash_size(void)
 
 	// Append a Record describing a small Block to the index_hash
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	// Expected size should be:
 	// Index Indicator - 1 byte
@@ -342,7 +338,7 @@ test_lzma_index_hash_size(void)
 
 	// Append additional small Record
 	assert_lzma_ret(lzma_index_hash_append(index_hash,
-			UNPADDED_SIZE_MIN, 1), LZMA_OK);
+			TUKTEST_UNPADDED_SIZE_MIN, 1), LZMA_OK);
 
 	// Expected size should be:
 	// Index Indicator - 1 byte

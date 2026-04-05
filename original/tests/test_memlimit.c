@@ -11,7 +11,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "tests.h"
-#include "mythread.h"
 
 
 #define MEMLIMIT_TOO_LOW 1234U
@@ -61,7 +60,7 @@ test_memlimit_stream_decoder(void)
 static void
 test_memlimit_stream_decoder_mt(void)
 {
-#ifndef MYTHREAD_ENABLED
+#if !TUKTEST_THREADS_ENABLED
 	assert_skip("Threading support disabled");
 #elif !defined(HAVE_DECODERS)
 	assert_skip("Decoder support disabled");
