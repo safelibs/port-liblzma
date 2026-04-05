@@ -1346,6 +1346,7 @@ if(BUILD_TESTING)
         test_index_hash
         test_lzip_decoder
         test_memlimit
+        test_public_api
         test_stream_flags
         test_vli
     )
