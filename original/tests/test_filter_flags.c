@@ -13,6 +13,10 @@
 
 #include "tests.h"
 
+// .xz reserves Filter IDs >= 2^62 for implementation-specific internal use,
+// and they must not appear in Filter Flags (doc/xz-file-format.txt, 3.1.5).
+#define TUKTEST_FILTER_RESERVED_START (LZMA_VLI_C(1) << 62)
+
 #if defined(HAVE_ENCODERS)
 // No tests are run without encoders, so init the global filters
 // only when the encoders are enabled.
@@ -121,6 +125,9 @@ test_lzma_filter_flags_size(void)
 	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
 			LZMA_OPTIONS_ERROR);
 	bad_filter.id = LZMA_VLI_MAX;
+	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
+			LZMA_PROG_ERROR);
+	bad_filter.id = TUKTEST_FILTER_RESERVED_START;
 	assert_lzma_ret(lzma_filter_flags_size(&size, &bad_filter),
 			LZMA_PROG_ERROR);
 #endif
@@ -249,7 +256,7 @@ test_lzma_filter_flags_encode(void)
 	}
 
 	// Test expected failing cases
-	lzma_filter bad_filter = { LZMA_VLI_MAX + 1, NULL };
+	lzma_filter bad_filter = { TUKTEST_FILTER_RESERVED_START, NULL };
 	size_t out_pos = 0;
 	size_t out_size = LZMA_BLOCK_HEADER_SIZE_MAX;
 	uint8_t out[LZMA_BLOCK_HEADER_SIZE_MAX];
@@ -421,12 +428,24 @@ test_lzma_filter_flags_decode(void)
 	uint8_t bad_encoded_filter[LZMA_BLOCK_HEADER_SIZE_MAX];
 	lzma_filter bad_filter;
 
-	// Invalid Filter ID
-	lzma_vli bad_filter_id = 2;
+	// Filter ID outside of valid range in Filter Flags
+	lzma_vli bad_filter_id = TUKTEST_FILTER_RESERVED_START;
 	size_t bad_encoded_out_pos = 0;
 	size_t in_pos = 0;
+
+	assert_lzma_ret(lzma_vli_encode(bad_filter_id, NULL,
+			bad_encoded_filter, &bad_encoded_out_pos,
+			LZMA_BLOCK_HEADER_SIZE_MAX), LZMA_OK);
+
+	assert_lzma_ret(lzma_filter_flags_decode(&bad_filter, NULL,
+			bad_encoded_filter, &in_pos,
+			LZMA_BLOCK_HEADER_SIZE_MAX), LZMA_DATA_ERROR);
+
 	bad_encoded_out_pos = 0;
 	in_pos = 0;
+
+	// Invalid Filter ID
+	bad_filter_id = 2;
 
 	assert_lzma_ret(lzma_vli_encode(bad_filter_id, NULL,
 			bad_encoded_filter, &bad_encoded_out_pos,
