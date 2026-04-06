@@ -1405,18 +1405,27 @@ unsafe fn stream_decoder_code(
         );
     }
 
-    if in_size != 0 {
-        coder
-            .input
-            .extend_from_slice(core::slice::from_raw_parts(input, in_size));
-        *in_pos = in_size;
-    }
-
     if coder.decoded {
         return LZMA_STREAM_END;
     }
 
+    let input_slice = if in_size == 0 {
+        &[][..]
+    } else {
+        core::slice::from_raw_parts(input, in_size)
+    };
+    let mut consumed_input = 0usize;
+
     if !coder.header_parsed {
+        let header_size = crate::internal::stream_flags::LZMA_STREAM_HEADER_SIZE;
+        let take = header_size
+            .saturating_sub(coder.input.len())
+            .min(input_slice.len());
+        if take != 0 {
+            coder.input.extend_from_slice(&input_slice[..take]);
+            consumed_input = take;
+        }
+
         match xz_stream_check(&coder.input) {
             Ok(Some(check_id)) => {
                 coder.check = check_id;
@@ -1436,6 +1445,7 @@ unsafe fn stream_decoder_code(
                 };
             }
             Ok(None) => {
+                *in_pos = consumed_input;
                 return if action == crate::internal::common::LZMA_FINISH {
                     LZMA_BUF_ERROR
                 } else {
@@ -1443,6 +1453,7 @@ unsafe fn stream_decoder_code(
                 };
             }
             Err(ret) => {
+                *in_pos = consumed_input;
                 return if action == crate::internal::common::LZMA_FINISH
                     && ret == crate::ffi::types::LZMA_DATA_ERROR
                 {
@@ -1459,8 +1470,15 @@ unsafe fn stream_decoder_code(
     if coder.pending_ret != LZMA_OK {
         let ret = coder.pending_ret;
         coder.pending_ret = LZMA_OK;
+        *in_pos = consumed_input;
         return ret;
     }
+
+    if consumed_input < input_slice.len() {
+        coder.input.extend_from_slice(&input_slice[consumed_input..]);
+        consumed_input = input_slice.len();
+    }
+    *in_pos = consumed_input;
 
     let concatenated = (coder.flags & LZMA_CONCATENATED) != 0;
     if coder.memusage == LZMA_MEMUSAGE_BASE
@@ -2178,6 +2196,41 @@ mod tests {
             let (ret, output) = pump(&mut strm, LZMA_FINISH, 32);
             assert_eq!(ret, LZMA_STREAM_END);
             assert!(output.is_empty());
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn stream_decoder_keeps_body_input_after_check_notification() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-1-3delta-lzma2.xz"
+        ));
+
+        unsafe {
+            let mut strm = LZMA_STREAM_INIT;
+            assert_eq!(
+                stream_decoder(&mut strm, u64::MAX, LZMA_TELL_ANY_CHECK | LZMA_TELL_NO_CHECK),
+                LZMA_OK
+            );
+
+            let mut output = [0u8; 4096];
+            strm.next_in = input.as_ptr();
+            strm.avail_in = input.len();
+            strm.next_out = output.as_mut_ptr();
+            strm.avail_out = output.len();
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_GET_CHECK);
+            assert_eq!(
+                strm.avail_in,
+                input.len() - crate::internal::stream_flags::LZMA_STREAM_HEADER_SIZE
+            );
+            assert_eq!(strm.total_out, 0);
+
+            strm.next_out = output.as_mut_ptr();
+            strm.avail_out = output.len();
+            let ret = lzma_code_impl(&mut strm, LZMA_RUN);
+            assert!(ret == LZMA_OK || ret == LZMA_STREAM_END);
+            assert!(strm.total_out > 0);
             lzma_end_impl(&mut strm);
         }
     }
