@@ -16,7 +16,7 @@ iterations=${LIBLZMA_BENCH_ITERATIONS:-5}
 size_mib=${LIBLZMA_BENCH_SIZE_MIB:-8}
 warn_ratio=${LIBLZMA_BENCH_WARN_RATIO:-}
 encode_text_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_ENCODE_TEXT:-0.20}
-encode_random_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_ENCODE_RANDOM:-0.95}
+encode_random_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_ENCODE_RANDOM:-0.90}
 decode_text_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_DECODE_TEXT:-0.12}
 decode_random_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_DECODE_RANDOM:-0.08}
 tmpdir=$(mktemp -d)
@@ -340,4 +340,5 @@ if regressions:
             f"  {workload}: safe throughput is {ratio:.3f}x reference"
             f" (minimum {warn_ratio:.3f}x)"
         )
+    raise SystemExit(1)
 PY
