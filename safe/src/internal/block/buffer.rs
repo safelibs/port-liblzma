@@ -363,7 +363,7 @@ pub(crate) unsafe fn block_buffer_decode(
 
     let compressed = core::slice::from_raw_parts(input.add(in_start), compressed_size);
     let decoded = match lzma::decode_raw(&chain, compressed) {
-        Ok(decoded) => decoded,
+        Ok((decoded, _consumed)) => decoded,
         Err(ret) => {
             if chain.prefilters.is_empty()
                 && matches!(chain.terminal, lzma::TerminalFilter::Lzma2 { .. })

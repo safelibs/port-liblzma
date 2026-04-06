@@ -1371,7 +1371,7 @@ pub(crate) unsafe fn raw_buffer_decode(
         Err(ret) => return ret,
     };
     let input_slice = core::slice::from_raw_parts(input.add(*input_pos), input_size - *input_pos);
-    let decoded = match lzma::decode_raw(&chain, input_slice) {
+    let (decoded, consumed) = match lzma::decode_raw(&chain, input_slice) {
         Ok(decoded) => decoded,
         Err(ret) => return ret,
     };
@@ -1380,7 +1380,7 @@ pub(crate) unsafe fn raw_buffer_decode(
     }
     ptr::copy_nonoverlapping(decoded.as_ptr(), output.add(*output_pos), decoded.len());
     *output_pos += decoded.len();
-    *input_pos = input_size;
+    *input_pos += consumed;
     LZMA_OK
 }
 

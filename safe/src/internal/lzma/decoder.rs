@@ -5,7 +5,10 @@ use crate::internal::{delta, simple};
 
 use super::common::{io_error_to_ret, ParsedFilterChain, Prefilter, TerminalFilter};
 
-pub(crate) fn decode_terminal(filter: &TerminalFilter, input: &[u8]) -> Result<Vec<u8>, lzma_ret> {
+pub(crate) fn decode_terminal(
+    filter: &TerminalFilter,
+    input: &[u8],
+) -> Result<(Vec<u8>, usize), lzma_ret> {
     match filter {
         TerminalFilter::Lzma1 {
             options,
@@ -27,7 +30,8 @@ pub(crate) fn decode_terminal(filter: &TerminalFilter, input: &[u8]) -> Result<V
             reader
                 .read_to_end(&mut out)
                 .map_err(|error| io_error_to_ret(&error))?;
-            Ok(out)
+            let consumed = reader.into_inner().position() as usize;
+            Ok((out, consumed))
         }
         TerminalFilter::Lzma2 { options } => {
             let mut reader = lzma_rust2::Lzma2Reader::new(
@@ -39,13 +43,14 @@ pub(crate) fn decode_terminal(filter: &TerminalFilter, input: &[u8]) -> Result<V
             reader
                 .read_to_end(&mut out)
                 .map_err(|error| io_error_to_ret(&error))?;
-            Ok(out)
+            let consumed = reader.into_inner().position() as usize;
+            Ok((out, consumed))
         }
     }
 }
 
-pub(crate) fn decode_raw(chain: &ParsedFilterChain, input: &[u8]) -> Result<Vec<u8>, lzma_ret> {
-    let mut out = decode_terminal(&chain.terminal, input)?;
+pub(crate) fn decode_raw(chain: &ParsedFilterChain, input: &[u8]) -> Result<(Vec<u8>, usize), lzma_ret> {
+    let (mut out, consumed) = decode_terminal(&chain.terminal, input)?;
 
     for filter in chain.prefilters.iter().rev() {
         out = match *filter {
@@ -54,5 +59,5 @@ pub(crate) fn decode_raw(chain: &ParsedFilterChain, input: &[u8]) -> Result<Vec<
         };
     }
 
-    Ok(out)
+    Ok((out, consumed))
 }
