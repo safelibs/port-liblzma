@@ -529,6 +529,12 @@ fn decoder_worker_loop(
         if ret == LZMA_STREAM_END && state_in_filled != state_in_size {
             ret = LZMA_PROG_ERROR;
         }
+        if ret == LZMA_STREAM_END {
+            let mut state = lock(&worker.state);
+            state.input = Vec::new();
+            state.in_size = 0;
+            state.in_filled = 0;
+        }
 
         {
             let mut shared_state = lock(&shared.state);
@@ -1657,6 +1663,69 @@ mod tests {
             );
             assert!(can_start, "threading conditions remain favorable");
             assert_eq!(decoder.pending_error, LZMA_PROG_ERROR);
+
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn successful_worker_releases_idle_input_buffer() {
+        unsafe {
+            let encoded = make_stream();
+            let mt = lzma_mt {
+                flags: 0,
+                threads: 2,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+            strm.next_in = encoded.as_ptr();
+            strm.avail_in = encoded.len();
+
+            let mut finished = false;
+            for _ in 0..128 {
+                let mut out = vec![0u8; 16 * 1024];
+                strm.next_out = out.as_mut_ptr();
+                strm.avail_out = out.len();
+                let ret = lzma_code_impl(&mut strm, LZMA_FINISH);
+                if ret == LZMA_STREAM_END {
+                    finished = true;
+                    break;
+                }
+                assert_eq!(ret, LZMA_OK);
+            }
+            assert!(finished, "threaded decoder should finish");
+
+            let decoder = &*decoder_from_stream(&strm);
+            for worker in &decoder.workers {
+                let state = lock(&worker.shared.state);
+                if !state.poisoned {
+                    assert!(state.input.is_empty());
+                    assert_eq!(state.input.capacity(), 0);
+                    assert_eq!(state.in_size, 0);
+                    assert_eq!(state.in_filled, 0);
+                }
+            }
 
             lzma_end_impl(&mut strm);
         }

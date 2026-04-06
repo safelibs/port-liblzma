@@ -1,5 +1,6 @@
 use core::ffi::c_void;
 use core::{mem, ptr};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -114,6 +115,8 @@ struct EncoderWorkerState {
 
 struct EncoderWorkerShared {
     state: Mutex<EncoderWorkerState>,
+    progress_in: AtomicU64,
+    progress_out: AtomicU64,
     cond: Condvar,
 }
 
@@ -393,6 +396,8 @@ fn encoder_worker_loop(
                         .unwrap_or_else(|poison| poison.into_inner());
                     state.progress_in = consumed as u64;
                     state.progress_out = out_pos as u64;
+                    worker.progress_in.store(consumed as u64, Ordering::Relaxed);
+                    worker.progress_out.store(out_pos as u64, Ordering::Relaxed);
 
                     while state.command == EncoderCommand::Run && state.in_size == consumed {
                         state = worker
@@ -540,6 +545,8 @@ fn encoder_worker_loop(
                 .saturating_add(block_opts.uncompressed_size);
             shared_state.progress_out = shared_state.progress_out.saturating_add(out_pos as u64);
             shared_state.free_workers.push(worker_id);
+            worker.progress_in.store(0, Ordering::Relaxed);
+            worker.progress_out.store(0, Ordering::Relaxed);
             drop(shared_state);
             shared.cond.notify_all();
         } else if job_ret != LZMA_OK {
@@ -550,6 +557,8 @@ fn encoder_worker_loop(
             if shared_state.thread_error == LZMA_OK {
                 shared_state.thread_error = job_ret;
             }
+            worker.progress_in.store(0, Ordering::Relaxed);
+            worker.progress_out.store(0, Ordering::Relaxed);
             drop(shared_state);
             shared.cond.notify_all();
         }
@@ -558,12 +567,14 @@ fn encoder_worker_loop(
             .state
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
+        let exit_requested =
+            command == EncoderCommand::Exit || state.command == EncoderCommand::Exit;
         state.progress_in = 0;
         state.progress_out = 0;
         state.in_size = 0;
         state.outbuf = None;
         state.filters = None;
-        state.command = if command == EncoderCommand::Exit {
+        state.command = if exit_requested {
             EncoderCommand::Exit
         } else {
             EncoderCommand::Idle
@@ -627,6 +638,8 @@ impl StreamEncoderMt {
                     progress_in: 0,
                     progress_out: 0,
                 }),
+                progress_in: AtomicU64::new(0),
+                progress_out: AtomicU64::new(0),
                 cond: Condvar::new(),
             });
 
@@ -931,9 +944,10 @@ impl StreamEncoderMt {
         let mut out_total = shared.progress_out;
 
         for worker in &self.workers {
-            let state = lock(&worker.shared.state);
-            in_total = in_total.saturating_add(state.progress_in);
-            out_total = out_total.saturating_add(state.progress_out);
+            in_total = in_total
+                .saturating_add(worker.shared.progress_in.load(Ordering::Relaxed));
+            out_total = out_total
+                .saturating_add(worker.shared.progress_out.load(Ordering::Relaxed));
         }
         drop(shared);
 
