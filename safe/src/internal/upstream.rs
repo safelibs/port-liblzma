@@ -1,20 +1,25 @@
 use core::ffi::c_void;
 use core::mem;
 use core::ptr;
-use std::io::{Cursor, Read};
+use std::{
+    cell::RefCell,
+    io::{self, Cursor, Read, Write},
+    rc::Rc,
+};
 
 use crate::ffi::types::{
     lzma_action, lzma_allocator, lzma_block, lzma_check, lzma_filter, lzma_options_lzma, lzma_ret,
-    lzma_stream, lzma_vli, LZMA_BUF_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR,
-    LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK, LZMA_VLI_UNKNOWN,
+    lzma_stream, LZMA_BUF_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END,
+    LZMA_UNSUPPORTED_CHECK, LZMA_VLI_UNKNOWN,
 };
 use crate::internal::block;
 use crate::internal::check;
 use crate::internal::common::{
-    all_supported_actions, lzma_bool as to_lzma_bool, LZMA_CHECK_CRC32, LZMA_PRESET_LEVEL_MASK,
+    all_supported_actions, ACTION_COUNT, LZMA_FINISH, LZMA_PRESET_LEVEL_MASK, LZMA_RUN,
+    LZMA_SYNC_FLUSH,
 };
 use crate::internal::filter;
-use crate::internal::lzma::{self, LZMA_LZMA1EXT_ALLOW_EOPM};
+use crate::internal::lzma::{self, ParsedFilterChain, Prefilter, TerminalFilter};
 use crate::internal::preset;
 use crate::internal::stream_state::{current_next_coder, install_next_coder, NextCoder};
 use crate::internal::vli::lzma_vli_encode_impl;
@@ -29,10 +34,47 @@ struct IndexRecord {
 
 struct RawCoder {
     filters: [lzma_filter; crate::ffi::types::LZMA_FILTERS_MAX + 1],
-    input: Vec<u8>,
-    output: Vec<u8>,
-    output_pos: usize,
-    encode: bool,
+    state: RawCoderState,
+}
+
+enum RawCoderState {
+    Encoder(RawEncoderState),
+    Decoder(RawDecoderState),
+}
+
+struct RawEncoderState {
+    writer: Option<Box<dyn FinishableWrite>>,
+    sink: SharedSink,
+    supports_sync_flush: bool,
+    finished: bool,
+    pending_stream_end: bool,
+}
+
+struct RawDecoderState {
+    reader: Box<dyn Read>,
+    source: SharedSource,
+    pending: Vec<u8>,
+    pending_pos: usize,
+    finished_input: bool,
+    stream_finished: bool,
+}
+
+#[derive(Clone, Default)]
+struct SharedSink(Rc<RefCell<SinkState>>);
+
+#[derive(Default)]
+struct SinkState {
+    data: Vec<u8>,
+    read_pos: usize,
+}
+
+#[derive(Clone, Default)]
+struct SharedSource(Rc<RefCell<SourceState>>);
+
+#[derive(Default)]
+struct SourceState {
+    data: Vec<u8>,
+    read_pos: usize,
     finished: bool,
 }
 
@@ -92,6 +134,355 @@ unsafe fn copy_output(
     } else {
         LZMA_OK
     }
+}
+
+trait FinishableWrite: Write {
+    fn finish(self: Box<Self>) -> Result<(), lzma_ret>;
+}
+
+impl SharedSink {
+    fn copy_available(
+        &self,
+        output: *mut u8,
+        out_pos: *mut usize,
+        out_size: usize,
+    ) -> usize {
+        let mut state = self.0.borrow_mut();
+        let available = state.data.len().saturating_sub(state.read_pos);
+        let copy_size = available.min(out_size - unsafe { *out_pos });
+        if copy_size == 0 {
+            return 0;
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(
+                state.data.as_ptr().add(state.read_pos),
+                output.add(*out_pos),
+                copy_size,
+            );
+            *out_pos += copy_size;
+        }
+        state.read_pos += copy_size;
+        if state.read_pos == state.data.len() {
+            state.data.clear();
+            state.read_pos = 0;
+        }
+
+        copy_size
+    }
+}
+
+impl Write for SharedSink {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.borrow_mut().data.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl SharedSource {
+    fn append(&self, buf: &[u8]) {
+        if buf.is_empty() {
+            return;
+        }
+
+        let mut state = self.0.borrow_mut();
+        state.data.extend_from_slice(buf);
+    }
+
+    fn finish(&self) {
+        self.0.borrow_mut().finished = true;
+    }
+}
+
+impl Read for SharedSource {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let mut state = self.0.borrow_mut();
+        let available = state.data.len().saturating_sub(state.read_pos);
+        if available == 0 {
+            return if state.finished {
+                Ok(0)
+            } else {
+                Err(io::Error::from(io::ErrorKind::WouldBlock))
+            };
+        }
+
+        let copy_size = available.min(buf.len());
+        buf[..copy_size].copy_from_slice(&state.data[state.read_pos..state.read_pos + copy_size]);
+        state.read_pos += copy_size;
+
+        if state.read_pos == state.data.len() {
+            state.data.clear();
+            state.read_pos = 0;
+        } else if state.read_pos >= 4096 && state.read_pos * 2 >= state.data.len() {
+            let drain_to = state.read_pos;
+            state.data.drain(..drain_to);
+            state.read_pos = 0;
+        }
+
+        Ok(copy_size)
+    }
+}
+
+struct TerminalLzma1Writer {
+    writer: Option<lzma_rust2::LzmaWriter<SharedSink>>,
+}
+
+impl Write for TerminalLzma1Writer {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.writer.as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.as_mut().unwrap().flush()
+    }
+}
+
+impl FinishableWrite for TerminalLzma1Writer {
+    fn finish(mut self: Box<Self>) -> Result<(), lzma_ret> {
+        self.writer
+            .take()
+            .unwrap()
+            .finish()
+            .map(|_| ())
+            .map_err(|error| lzma::io_error_to_ret(&error))
+    }
+}
+
+struct TerminalLzma2Writer {
+    writer: Option<lzma_rust2::Lzma2Writer<SharedSink>>,
+}
+
+impl Write for TerminalLzma2Writer {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.writer.as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.as_mut().unwrap().flush()
+    }
+}
+
+impl FinishableWrite for TerminalLzma2Writer {
+    fn finish(mut self: Box<Self>) -> Result<(), lzma_ret> {
+        self.writer
+            .take()
+            .unwrap()
+            .finish()
+            .map(|_| ())
+            .map_err(|error| lzma::io_error_to_ret(&error))
+    }
+}
+
+struct DeltaWriterWrapper {
+    writer: Option<lzma_rust2::filter::delta::DeltaWriter<Box<dyn FinishableWrite>>>,
+}
+
+impl Write for DeltaWriterWrapper {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.writer.as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.as_mut().unwrap().flush()
+    }
+}
+
+impl FinishableWrite for DeltaWriterWrapper {
+    fn finish(mut self: Box<Self>) -> Result<(), lzma_ret> {
+        self.writer.take().unwrap().into_inner().finish()
+    }
+}
+
+struct BcjWriterWrapper {
+    writer: Option<lzma_rust2::filter::bcj::BcjWriter<Box<dyn FinishableWrite>>>,
+}
+
+impl Write for BcjWriterWrapper {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.writer.as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.as_mut().unwrap().flush()
+    }
+}
+
+impl FinishableWrite for BcjWriterWrapper {
+    fn finish(mut self: Box<Self>) -> Result<(), lzma_ret> {
+        let inner = self
+            .writer
+            .take()
+            .unwrap()
+            .finish()
+            .map_err(|error| lzma::io_error_to_ret(&error))?;
+        inner.finish()
+    }
+}
+
+fn wrap_bcj_writer(
+    kind: crate::internal::simple::SimpleFilterKind,
+    start_offset: u32,
+    inner: Box<dyn FinishableWrite>,
+) -> Box<dyn FinishableWrite> {
+    let writer = match kind {
+        crate::internal::simple::SimpleFilterKind::X86 => {
+            lzma_rust2::filter::bcj::BcjWriter::new_x86(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::PowerPc => {
+            lzma_rust2::filter::bcj::BcjWriter::new_ppc(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::Ia64 => {
+            lzma_rust2::filter::bcj::BcjWriter::new_ia64(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::Arm => {
+            lzma_rust2::filter::bcj::BcjWriter::new_arm(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::ArmThumb => {
+            lzma_rust2::filter::bcj::BcjWriter::new_arm_thumb(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::Arm64 => {
+            lzma_rust2::filter::bcj::BcjWriter::new_arm64(inner, start_offset as usize)
+        }
+        crate::internal::simple::SimpleFilterKind::Sparc => {
+            lzma_rust2::filter::bcj::BcjWriter::new_sparc(inner, start_offset as usize)
+        }
+    };
+
+    Box::new(BcjWriterWrapper {
+        writer: Some(writer),
+    })
+}
+
+fn wrap_bcj_reader(
+    kind: crate::internal::simple::SimpleFilterKind,
+    start_offset: u32,
+    inner: Box<dyn Read>,
+) -> Box<dyn Read> {
+    match kind {
+        crate::internal::simple::SimpleFilterKind::X86 => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_x86(inner, start_offset as usize))
+        }
+        crate::internal::simple::SimpleFilterKind::PowerPc => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_ppc(inner, start_offset as usize))
+        }
+        crate::internal::simple::SimpleFilterKind::Ia64 => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_ia64(inner, start_offset as usize))
+        }
+        crate::internal::simple::SimpleFilterKind::Arm => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_arm(inner, start_offset as usize))
+        }
+        crate::internal::simple::SimpleFilterKind::ArmThumb => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_arm_thumb(inner, start_offset as usize),
+        ),
+        crate::internal::simple::SimpleFilterKind::Arm64 => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_arm64(inner, start_offset as usize))
+        }
+        crate::internal::simple::SimpleFilterKind::Sparc => {
+            Box::new(lzma_rust2::filter::bcj::BcjReader::new_sparc(inner, start_offset as usize))
+        }
+    }
+}
+
+fn build_raw_encoder(
+    chain: &ParsedFilterChain,
+    sink: SharedSink,
+) -> Result<(Box<dyn FinishableWrite>, bool), lzma_ret> {
+    let mut writer: Box<dyn FinishableWrite> = match &chain.terminal {
+        TerminalFilter::Lzma1 {
+            options,
+            allow_eopm,
+            ..
+        } => Box::new(TerminalLzma1Writer {
+            writer: Some(
+                lzma_rust2::LzmaWriter::new_no_header(sink.clone(), options, *allow_eopm)
+                    .map_err(|error| lzma::io_error_to_ret(&error))?,
+            ),
+        }),
+        TerminalFilter::Lzma2 { options } => Box::new(TerminalLzma2Writer {
+            writer: Some(lzma_rust2::Lzma2Writer::new(sink.clone(), options.clone())),
+        }),
+    };
+
+    let mut supports_sync_flush = matches!(chain.terminal, TerminalFilter::Lzma2 { .. });
+    for filter in chain.prefilters.iter().rev() {
+        writer = match *filter {
+            Prefilter::Delta { distance } => Box::new(DeltaWriterWrapper {
+                writer: Some(lzma_rust2::filter::delta::DeltaWriter::new(writer, distance)),
+            }),
+            Prefilter::Simple {
+                kind,
+                start_offset,
+            } => {
+                supports_sync_flush = false;
+                wrap_bcj_writer(kind, start_offset, writer)
+            }
+        };
+    }
+
+    Ok((writer, supports_sync_flush))
+}
+
+fn build_raw_decoder(chain: &ParsedFilterChain, source: SharedSource) -> Result<Box<dyn Read>, lzma_ret> {
+    let mut reader: Box<dyn Read> = match &chain.terminal {
+        TerminalFilter::Lzma1 {
+            options,
+            expected_uncompressed_size,
+            ..
+        } => Box::new(
+            lzma_rust2::LzmaReader::new(
+                source.clone(),
+                expected_uncompressed_size.unwrap_or(u64::MAX),
+                options.lc,
+                options.lp,
+                options.pb,
+                options.dict_size,
+                options.preset_dict.as_deref(),
+            )
+            .map_err(|error| lzma::io_error_to_ret(&error))?,
+        ),
+        TerminalFilter::Lzma2 { options } => Box::new(lzma_rust2::Lzma2Reader::new(
+            source.clone(),
+            options.lzma_options.dict_size,
+            options.lzma_options.preset_dict.as_deref(),
+        )),
+    };
+
+    for filter in chain.prefilters.iter().rev() {
+        reader = match *filter {
+            Prefilter::Delta { distance } => {
+                Box::new(lzma_rust2::filter::delta::DeltaReader::new(reader, distance))
+            }
+            Prefilter::Simple {
+                kind,
+                start_offset,
+            } => wrap_bcj_reader(kind, start_offset, reader),
+        };
+    }
+
+    Ok(reader)
+}
+
+const fn raw_encoder_actions() -> [bool; ACTION_COUNT] {
+    let mut actions = [false; ACTION_COUNT];
+    actions[LZMA_RUN as usize] = true;
+    actions[LZMA_SYNC_FLUSH as usize] = true;
+    actions[LZMA_FINISH as usize] = true;
+    actions
+}
+
+const fn raw_decoder_actions() -> [bool; ACTION_COUNT] {
+    let mut actions = [false; ACTION_COUNT];
+    actions[LZMA_RUN as usize] = true;
+    actions[LZMA_FINISH as usize] = true;
+    actions
 }
 
 fn append_vli(output: &mut Vec<u8>, value: u64) {
@@ -388,41 +779,150 @@ unsafe fn raw_code(
     action: lzma_action,
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<RawCoder>();
-    if coder.output_pos < coder.output.len() {
-        return copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size);
+    match &mut coder.state {
+        RawCoderState::Encoder(state) => {
+            let copied = state.sink.copy_available(output, out_pos, out_size);
+            if copied != 0 {
+                if state.pending_stream_end && state.sink.copy_available(output, out_pos, out_size) == 0 {
+                    if !state.finished {
+                        state.pending_stream_end = false;
+                    }
+                    return LZMA_STREAM_END;
+                }
+                if *out_pos == out_size {
+                    return LZMA_OK;
+                }
+            }
+
+            if state.finished {
+                return LZMA_STREAM_END;
+            }
+
+            if in_size != 0 {
+                if input.is_null() {
+                    return LZMA_PROG_ERROR;
+                }
+                let input_slice = core::slice::from_raw_parts(input, in_size);
+                if let Err(error) = state.writer.as_mut().unwrap().write_all(input_slice) {
+                    return lzma::io_error_to_ret(&error);
+                }
+                *in_pos = in_size;
+            }
+
+            match action {
+                LZMA_RUN => {}
+                LZMA_SYNC_FLUSH => {
+                    if !state.supports_sync_flush {
+                        return LZMA_OPTIONS_ERROR;
+                    }
+                    if let Err(error) = state.writer.as_mut().unwrap().flush() {
+                        return lzma::io_error_to_ret(&error);
+                    }
+                    state.pending_stream_end = true;
+                }
+                LZMA_FINISH => {
+                    if let Err(ret) = state.writer.take().unwrap().finish() {
+                        return ret;
+                    }
+                    state.finished = true;
+                    state.pending_stream_end = true;
+                }
+                _ => return LZMA_PROG_ERROR,
+            }
+
+            let copied = state.sink.copy_available(output, out_pos, out_size);
+            if state.pending_stream_end && copied == 0 {
+                if !state.finished {
+                    state.pending_stream_end = false;
+                }
+                LZMA_STREAM_END
+            } else {
+                LZMA_OK
+            }
+        }
+        RawCoderState::Decoder(state) => {
+            if state.pending_pos < state.pending.len() {
+                let ret = copy_output(&state.pending, &mut state.pending_pos, output, out_pos, out_size);
+                if state.pending_pos == state.pending.len() {
+                    state.pending.clear();
+                    state.pending_pos = 0;
+                } else {
+                    return LZMA_OK;
+                }
+                if ret == LZMA_STREAM_END && state.stream_finished {
+                    return LZMA_STREAM_END;
+                }
+                if *out_pos == out_size {
+                    return LZMA_OK;
+                }
+            }
+
+            if in_size != 0 {
+                if input.is_null() {
+                    return LZMA_PROG_ERROR;
+                }
+                state
+                    .source
+                    .append(core::slice::from_raw_parts(input, in_size));
+                *in_pos = in_size;
+            }
+
+            if action == LZMA_FINISH && !state.finished_input {
+                state.source.finish();
+                state.finished_input = true;
+            }
+
+            if state.stream_finished {
+                return LZMA_STREAM_END;
+            }
+
+            let target = (out_size - *out_pos).max(1);
+            while state.pending.len().saturating_sub(state.pending_pos) < target && !state.stream_finished {
+                let read_len = (target - state.pending.len().saturating_sub(state.pending_pos)).max(1).min(8192);
+                let mut temp = vec![0u8; read_len];
+                match state.reader.read(&mut temp) {
+                    Ok(0) => {
+                        state.stream_finished = true;
+                        break;
+                    }
+                    Ok(read) => state.pending.extend_from_slice(&temp[..read]),
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                    Err(error) => return lzma::io_error_to_ret(&error),
+                }
+            }
+
+            if state.finished_input
+                && !state.stream_finished
+                && state.pending.len().saturating_sub(state.pending_pos) == target
+            {
+                let mut lookahead = [0u8; 1];
+                match state.reader.read(&mut lookahead) {
+                    Ok(0) => state.stream_finished = true,
+                    Ok(1) => state.pending.push(lookahead[0]),
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+                    Err(error) => return lzma::io_error_to_ret(&error),
+                    _ => unreachable!(),
+                }
+            }
+
+            if state.pending_pos < state.pending.len() {
+                let ret = copy_output(&state.pending, &mut state.pending_pos, output, out_pos, out_size);
+                if state.pending_pos == state.pending.len() {
+                    state.pending.clear();
+                    state.pending_pos = 0;
+                }
+                if ret == LZMA_STREAM_END && state.stream_finished {
+                    LZMA_STREAM_END
+                } else {
+                    LZMA_OK
+                }
+            } else if state.stream_finished {
+                LZMA_STREAM_END
+            } else {
+                LZMA_OK
+            }
+        }
     }
-
-    if in_size != 0 {
-        coder.input.extend_from_slice(core::slice::from_raw_parts(input, in_size));
-        *in_pos = in_size;
-    }
-
-    if coder.finished {
-        return LZMA_STREAM_END;
-    }
-
-    if action != crate::internal::common::LZMA_FINISH {
-        return LZMA_OK;
-    }
-
-    let chain = match lzma::parse_filters(coder.filters.as_ptr()) {
-        Ok(chain) => chain,
-        Err(ret) => return ret,
-    };
-
-    let result = if coder.encode {
-        lzma::encode_raw(&chain, &coder.input)
-    } else {
-        lzma::decode_raw(&chain, &coder.input)
-    };
-
-    coder.output = match result {
-        Ok(output) => output,
-        Err(ret) => return ret,
-    };
-    coder.output_pos = 0;
-    coder.finished = true;
-    copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size)
 }
 
 unsafe fn raw_end(coder: *mut c_void, _allocator: *const lzma_allocator) {
@@ -662,20 +1162,37 @@ pub(crate) unsafe fn raw_encoder(strm: *mut lzma_stream, filters: *const lzma_fi
     if strm.is_null() {
         return LZMA_PROG_ERROR;
     }
-    let copied = match copy_filters(filters) {
+    let mut copied = match copy_filters(filters) {
         Ok(copied) => copied,
         Err(ret) => return ret,
+    };
+    let chain = match lzma::parse_filters(copied.as_ptr()) {
+        Ok(chain) => chain,
+        Err(ret) => {
+            free_filters(&mut copied);
+            return ret;
+        }
+    };
+    let sink = SharedSink::default();
+    let (writer, supports_sync_flush) = match build_raw_encoder(&chain, sink.clone()) {
+        Ok(writer) => writer,
+        Err(ret) => {
+            free_filters(&mut copied);
+            return ret;
+        }
     };
     install_next_coder(
         strm,
         NextCoder {
             coder: Box::into_raw(Box::new(RawCoder {
                 filters: copied,
-                input: Vec::new(),
-                output: Vec::new(),
-                output_pos: 0,
-                encode: true,
-                finished: false,
+                state: RawCoderState::Encoder(RawEncoderState {
+                    writer: Some(writer),
+                    sink,
+                    supports_sync_flush,
+                    finished: false,
+                    pending_stream_end: false,
+                }),
             }))
             .cast(),
             code: raw_code,
@@ -684,7 +1201,7 @@ pub(crate) unsafe fn raw_encoder(strm: *mut lzma_stream, filters: *const lzma_fi
             get_check: None,
             memconfig: None,
         },
-        all_supported_actions(),
+        raw_encoder_actions(),
     )
 }
 
@@ -692,20 +1209,38 @@ pub(crate) unsafe fn raw_decoder(strm: *mut lzma_stream, filters: *const lzma_fi
     if strm.is_null() {
         return LZMA_PROG_ERROR;
     }
-    let copied = match copy_filters(filters) {
+    let mut copied = match copy_filters(filters) {
         Ok(copied) => copied,
         Err(ret) => return ret,
+    };
+    let chain = match lzma::parse_filters(copied.as_ptr()) {
+        Ok(chain) => chain,
+        Err(ret) => {
+            free_filters(&mut copied);
+            return ret;
+        }
+    };
+    let source = SharedSource::default();
+    let reader = match build_raw_decoder(&chain, source.clone()) {
+        Ok(reader) => reader,
+        Err(ret) => {
+            free_filters(&mut copied);
+            return ret;
+        }
     };
     install_next_coder(
         strm,
         NextCoder {
             coder: Box::into_raw(Box::new(RawCoder {
                 filters: copied,
-                input: Vec::new(),
-                output: Vec::new(),
-                output_pos: 0,
-                encode: false,
-                finished: false,
+                state: RawCoderState::Decoder(RawDecoderState {
+                    reader,
+                    source,
+                    pending: Vec::new(),
+                    pending_pos: 0,
+                    finished_input: false,
+                    stream_finished: false,
+                }),
             }))
             .cast(),
             code: raw_code,
@@ -714,7 +1249,7 @@ pub(crate) unsafe fn raw_decoder(strm: *mut lzma_stream, filters: *const lzma_fi
             get_check: None,
             memconfig: None,
         },
-        all_supported_actions(),
+        raw_decoder_actions(),
     )
 }
 
@@ -881,7 +1416,7 @@ pub(crate) unsafe fn filters_update(strm: *mut lzma_stream, filters: *const lzma
     let Some(next) = current_next_coder(strm) else {
         return LZMA_PROG_ERROR;
     };
-    if next.code as usize != stream_encoder_code as usize {
+    if next.code as *const () as usize != stream_encoder_code as *const () as usize {
         return LZMA_PROG_ERROR;
     }
     let coder = &mut *next.coder.cast::<StreamEncoderCoder>();
@@ -889,7 +1424,7 @@ pub(crate) unsafe fn filters_update(strm: *mut lzma_stream, filters: *const lzma
         return LZMA_PROG_ERROR;
     }
 
-    let mut new_filters = match copy_filters(filters) {
+    let new_filters = match copy_filters(filters) {
         Ok(filters) => filters,
         Err(ret) => return ret,
     };
@@ -966,4 +1501,116 @@ pub(crate) unsafe fn easy_decoder_memusage(preset_id: u32) -> u64 {
 
 pub(crate) unsafe fn auto_decoder(strm: *mut lzma_stream, memlimit: u64, flags: u32) -> lzma_ret {
     stream_decoder(strm, memlimit, flags)
+}
+
+#[cfg(test)]
+mod tests {
+    use core::{mem, ptr};
+
+    use super::*;
+    use crate::ffi::types::{lzma_filter, lzma_options_lzma, LZMA_STREAM_INIT};
+    use crate::internal::{
+        filter::common::LZMA_FILTER_LZMA2,
+        stream_state::{lzma_code_impl, lzma_end_impl},
+    };
+
+    unsafe fn lzma2_filters(
+        options: &mut lzma_options_lzma,
+    ) -> [lzma_filter; crate::ffi::types::LZMA_FILTERS_MAX + 1] {
+        assert_eq!(preset::lzma_lzma_preset_impl(options, 6), 0);
+        [
+            lzma_filter {
+                id: LZMA_FILTER_LZMA2,
+                options: (options as *mut lzma_options_lzma).cast(),
+            },
+            lzma_filter {
+                id: LZMA_VLI_UNKNOWN,
+                options: ptr::null_mut(),
+            },
+            lzma_filter {
+                id: LZMA_VLI_UNKNOWN,
+                options: ptr::null_mut(),
+            },
+            lzma_filter {
+                id: LZMA_VLI_UNKNOWN,
+                options: ptr::null_mut(),
+            },
+            lzma_filter {
+                id: LZMA_VLI_UNKNOWN,
+                options: ptr::null_mut(),
+            },
+        ]
+    }
+
+    unsafe fn pump(
+        strm: &mut lzma_stream,
+        action: lzma_action,
+        output_chunk: usize,
+    ) -> (lzma_ret, Vec<u8>) {
+        let mut output = Vec::new();
+        loop {
+            let mut buffer = vec![0u8; output_chunk];
+            strm.next_out = buffer.as_mut_ptr();
+            strm.avail_out = buffer.len();
+            let ret = lzma_code_impl(strm, action);
+            let written = buffer.len() - strm.avail_out;
+            output.extend_from_slice(&buffer[..written]);
+
+            if ret == LZMA_STREAM_END {
+                return (ret, output);
+            }
+            if ret != LZMA_OK {
+                return (ret, output);
+            }
+            if action == LZMA_RUN && strm.avail_in == 0 {
+                return (ret, output);
+            }
+        }
+    }
+
+    #[test]
+    fn raw_encoder_sync_flush_emits_midstream_bytes() {
+        let part1 = vec![b'A'; 16 * 1024];
+        let part2 = vec![b'B'; 8 * 1024];
+        let mut encoded = Vec::new();
+
+        unsafe {
+            let mut options: lzma_options_lzma = mem::zeroed();
+            let filters = lzma2_filters(&mut options);
+            let mut strm = LZMA_STREAM_INIT;
+            assert_eq!(raw_encoder(&mut strm, filters.as_ptr()), LZMA_OK);
+
+            strm.next_in = part1.as_ptr();
+            strm.avail_in = part1.len();
+            let (ret, run_bytes) = pump(&mut strm, LZMA_RUN, 257);
+            assert_eq!(ret, LZMA_OK);
+            encoded.extend_from_slice(&run_bytes);
+
+            strm.next_in = ptr::null();
+            strm.avail_in = 0;
+            let (ret, flush_bytes) = pump(&mut strm, LZMA_SYNC_FLUSH, 257);
+            assert_eq!(ret, LZMA_STREAM_END);
+            assert!(!flush_bytes.is_empty());
+            encoded.extend_from_slice(&flush_bytes);
+
+            strm.next_in = part2.as_ptr();
+            strm.avail_in = part2.len();
+            let (ret, finish_bytes) = pump(&mut strm, LZMA_FINISH, 257);
+            assert_eq!(ret, LZMA_STREAM_END);
+            encoded.extend_from_slice(&finish_bytes);
+            lzma_end_impl(&mut strm);
+
+            let mut decode_options: lzma_options_lzma = mem::zeroed();
+            let decode_filters = lzma2_filters(&mut decode_options);
+            let mut decode = LZMA_STREAM_INIT;
+            assert_eq!(raw_decoder(&mut decode, decode_filters.as_ptr()), LZMA_OK);
+
+            decode.next_in = encoded.as_ptr();
+            decode.avail_in = encoded.len();
+            let (ret, decoded) = pump(&mut decode, LZMA_FINISH, 1024);
+            assert_eq!(ret, LZMA_STREAM_END);
+            assert_eq!(decoded, [part1, part2].concat());
+            lzma_end_impl(&mut decode);
+        }
+    }
 }
