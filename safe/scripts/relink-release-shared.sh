@@ -13,6 +13,8 @@ compat_map="$compat_dir/liblzma_linux.relink.map"
 redefine_syms="$compat_dir/redefine-public-symbols.txt"
 default_aliases="$compat_dir/linux_symver_defaults.S"
 default_aliases_obj="$compat_dir/linux_symver_defaults.o"
+compat_aliases="$compat_dir/linux_symver_compat.S"
+compat_aliases_obj="$compat_dir/linux_symver_compat.o"
 
 mkdir -p "$compat_dir"
 
@@ -117,9 +119,36 @@ EOF
 
 cc -fPIC -c "$default_aliases" -o "$default_aliases_obj"
 
+cat > "$compat_aliases" <<'EOF'
+    .text
+
+    .macro version_compat alias, exported, target
+    .globl \alias
+    .type \alias, @function
+\alias:
+    jmp \target
+    .size \alias, .-\alias
+    .symver \alias, \exported
+    .endm
+
+    version_compat __symver_lzma_stream_encoder_mt_XZ_5_1_2alpha, lzma_stream_encoder_mt@XZ_5.1.2alpha, __safe_impl_lzma_stream_encoder_mt
+    version_compat __symver_lzma_stream_encoder_mt_memusage_XZ_5_1_2alpha, lzma_stream_encoder_mt_memusage@XZ_5.1.2alpha, __safe_impl_lzma_stream_encoder_mt_memusage
+
+    version_compat __symver_lzma_block_uncomp_encode_XZ_5_2_2, lzma_block_uncomp_encode@XZ_5.2.2, __safe_impl_lzma_block_uncomp_encode
+    version_compat __symver_lzma_cputhreads_XZ_5_2_2, lzma_cputhreads@XZ_5.2.2, __safe_impl_lzma_cputhreads
+    version_compat __symver_lzma_get_progress_XZ_5_2_2, lzma_get_progress@XZ_5.2.2, __safe_impl_lzma_get_progress
+    version_compat __symver_lzma_stream_encoder_mt_XZ_5_2_2, lzma_stream_encoder_mt@XZ_5.2.2, __safe_impl_lzma_stream_encoder_mt
+    version_compat __symver_lzma_stream_encoder_mt_memusage_XZ_5_2_2, lzma_stream_encoder_mt_memusage@XZ_5.2.2, __safe_impl_lzma_stream_encoder_mt_memusage
+
+    .section .note.GNU-stack,"",@progbits
+EOF
+
+cc -fPIC -c "$compat_aliases" -o "$compat_aliases_obj"
+
 cc -shared \
   -o "$shared_lib" \
   "$default_aliases_obj" \
+  "$compat_aliases_obj" \
   -Wl,--whole-archive "$compat_archive" -Wl,--no-whole-archive \
   -Wl,--version-script="$compat_map" \
   -Wl,-soname,liblzma.so.5 \
