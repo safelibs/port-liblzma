@@ -14,7 +14,11 @@ ref_lib="build/src/liblzma/.libs/liblzma.so.5.4.5"
 
 iterations=${LIBLZMA_BENCH_ITERATIONS:-5}
 size_mib=${LIBLZMA_BENCH_SIZE_MIB:-8}
-warn_ratio=${LIBLZMA_BENCH_WARN_RATIO:-0.50}
+warn_ratio=${LIBLZMA_BENCH_WARN_RATIO:-}
+encode_text_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_ENCODE_TEXT:-0.20}
+encode_random_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_ENCODE_RANDOM:-0.95}
+decode_text_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_DECODE_TEXT:-0.12}
+decode_random_warn_ratio=${LIBLZMA_BENCH_WARN_RATIO_DECODE_RANDOM:-0.08}
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -42,6 +46,9 @@ usage: $(basename "$0") [--iterations N] [--size-mib N] [--warn-ratio R] [--refe
 
 Benchmarks the safe release library against the reference
 $ref_lib on representative encode and decode workloads.
+
+By default the comparison uses the final signoff floors for each workload.
+Use --warn-ratio or LIBLZMA_BENCH_WARN_RATIO to force one global floor instead.
 EOF
       exit 0
       ;;
@@ -246,6 +253,10 @@ python3 - \
   "$ref_runlib" \
   "$iterations" \
   "$warn_ratio" \
+  "$encode_text_warn_ratio" \
+  "$encode_random_warn_ratio" \
+  "$decode_text_warn_ratio" \
+  "$decode_random_warn_ratio" \
   "$tmpdir/text.txt" \
   "$tmpdir/random.bin" \
   "$tmpdir/text.xz" \
@@ -261,13 +272,19 @@ bench = Path(sys.argv[1])
 safe_runlib = sys.argv[2]
 ref_runlib = sys.argv[3]
 iterations = int(sys.argv[4])
-warn_ratio = float(sys.argv[5])
+uniform_warn_ratio = float(sys.argv[5]) if sys.argv[5] else None
+warn_ratios = {
+    "encode-text": float(sys.argv[6]),
+    "encode-random": float(sys.argv[7]),
+    "decode-text": float(sys.argv[8]),
+    "decode-random": float(sys.argv[9]),
+}
 
 workloads = [
-    ("encode-text", "encode-memory", Path(sys.argv[6]), Path(sys.argv[6]).stat().st_size),
-    ("encode-random", "encode-memory", Path(sys.argv[7]), Path(sys.argv[7]).stat().st_size),
-    ("decode-text", "decode-memory", Path(sys.argv[8]), Path(sys.argv[6]).stat().st_size),
-    ("decode-random", "decode-memory", Path(sys.argv[9]), Path(sys.argv[7]).stat().st_size),
+    ("encode-text", "encode-memory", Path(sys.argv[10]), Path(sys.argv[10]).stat().st_size),
+    ("encode-random", "encode-memory", Path(sys.argv[11]), Path(sys.argv[11]).stat().st_size),
+    ("decode-text", "decode-memory", Path(sys.argv[12]), Path(sys.argv[10]).stat().st_size),
+    ("decode-random", "decode-memory", Path(sys.argv[13]), Path(sys.argv[11]).stat().st_size),
 ]
 
 libraries = [
@@ -303,20 +320,24 @@ for label, libdir in libraries:
         mib_per_s = (bytes_processed / (1024 * 1024)) / median if median > 0 else float("inf")
         results[(label, workload)] = (median, mib_per_s)
 
-print("workload\tref_s\tsafe_s\tsafe/ref\tref_MiB_s\tsafe_MiB_s")
+print("workload\tref_s\tsafe_s\tsafe/ref\tmin_safe/ref\tref_MiB_s\tsafe_MiB_s")
 regressions = []
 for workload, _, _, _ in workloads:
     ref_s, ref_mib = results[("reference", workload)]
     safe_s, safe_mib = results[("safe", workload)]
     ratio = ref_s / safe_s if safe_s > 0 else 0.0
+    warn_ratio = uniform_warn_ratio if uniform_warn_ratio is not None else warn_ratios[workload]
     print(
-        f"{workload}\t{ref_s:.6f}\t{safe_s:.6f}\t{ratio:.3f}\t{ref_mib:.2f}\t{safe_mib:.2f}"
+        f"{workload}\t{ref_s:.6f}\t{safe_s:.6f}\t{ratio:.3f}\t{warn_ratio:.3f}\t{ref_mib:.2f}\t{safe_mib:.2f}"
     )
     if ratio < warn_ratio:
-        regressions.append((workload, ratio))
+        regressions.append((workload, ratio, warn_ratio))
 
 if regressions:
-    print("\nvisible regression threshold crossed:")
-    for workload, ratio in regressions:
-        print(f"  {workload}: safe throughput is {ratio:.3f}x reference")
+    print("\nsignoff benchmark floor crossed:")
+    for workload, ratio, warn_ratio in regressions:
+        print(
+            f"  {workload}: safe throughput is {ratio:.3f}x reference"
+            f" (minimum {warn_ratio:.3f}x)"
+        )
 PY

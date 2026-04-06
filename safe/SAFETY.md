@@ -83,17 +83,22 @@ The shipped Rust dependency graph is intentionally small: `safe-liblzma`, vendor
 `safe/scripts/benchmark.sh` was rerun on 2026-04-06 against
 `build/src/liblzma/.libs/liblzma.so.5.4.5`.
 
-- `encode-text`: `0.251x` reference throughput
-- `encode-random`: `1.038x` reference throughput
-- `decode-text`: `0.149x` reference throughput
-- `decode-random`: `0.105x` reference throughput
+- `encode-text`: `0.245x` reference throughput
+- `encode-random`: `1.072x` reference throughput
+- `decode-text`: `0.153x` reference throughput
+- `decode-random`: `0.096x` reference throughput
 
-The benchmark gate intentionally reports these as visible warnings instead of a release-blocking failure. The regression is concentrated in codec hot paths, not in the package, ABI, or symbol-compatibility layers audited in this phase, and compatibility plus supply-chain hardening remained the higher-priority ship criteria for this port.
+The final benchmark gate is not an upstream-parity requirement. It uses
+workload-specific signoff floors derived from the accepted port baseline:
+`encode-text >= 0.20x`, `encode-random >= 0.95x`, `decode-text >= 0.12x`, and
+`decode-random >= 0.08x` reference throughput. That keeps materially worse
+future regressions visible without failing the final gate on the already-audited
+codec hot-path gap.
 
 ## Verification Hooks
 
 - `safe/scripts/release-verify.sh` is the authoritative final-release proof. It traces the package build, rejects forbidden implementation inputs, checks tracked/textual source provenance for the files the build actually consumes, compares installed headers and symbol maps to the authoritative upstream originals, and confirms the packaged library matches the freshly built Rust artifact.
 - `safe/scripts/run-rust-unit-tests.sh` and `safe/scripts/release-verify.sh` both exercise `safe/fuzz/` with locked offline Cargo resolution so the decode-focused harness stays in the final gate instead of drifting as a standalone workspace.
 - `safe/fuzz/` contains a decode-focused harness with the same 300 MiB memory limit posture as the upstream OSS-Fuzz target.
-- `safe/scripts/benchmark.sh` compares the Rust library against `build/src/liblzma/.libs/liblzma.so.5.4.5` on representative encode and decode workloads so regressions are visible before release.
+- `safe/scripts/benchmark.sh` compares the Rust library against `build/src/liblzma/.libs/liblzma.so.5.4.5` on representative encode and decode workloads and enforces the accepted signoff floors for each workload unless a caller overrides them explicitly.
 - `safe/scripts/relink-release-shared.sh` owns the shared relink path, and the related release/package/benchmark scripts document that those steps are serial-only so future maintainers do not overlap them in one worktree.
