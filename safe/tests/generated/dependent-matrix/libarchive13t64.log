@@ -28,7 +28,7 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive13t6
 
 #8 exporting to image
 #8 exporting layers done
-#8 writing image sha256:e9aad97b6dc8f962de3aa9a4e4eae80a64f9de9b601f31abcddeda4e303d6c19 done
+#8 writing image sha256:a57c762f361a135bcc475bd3074a726f813cbbef553064801f214c5bdb5e6912 done
 #8 naming to docker.io/library/liblzma-dependent-test:ubuntu24.04-safe done
 #8 DONE 0.0s
 liblzma-dependent-test:ubuntu24.04-safe
