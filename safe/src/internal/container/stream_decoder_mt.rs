@@ -263,11 +263,25 @@ fn request_partial_output(coder: &StreamDecoderMt, worker_id: usize) {
 }
 
 fn abort_workers(coder: &StreamDecoderMt) {
-    for worker in &coder.workers {
+    abort_decoder_workers(&coder.workers);
+}
+
+fn abort_decoder_workers(workers: &[DecoderWorker]) {
+    for worker in workers {
         let mut state = lock(&worker.shared.state);
         state.command = DecoderCommand::Exit;
         worker.shared.cond.notify_all();
     }
+}
+
+fn shutdown_decoder_workers(shared: &Arc<DecoderShared>, workers: &mut [DecoderWorker]) {
+    abort_decoder_workers(workers);
+    for worker in workers.iter_mut() {
+        if let Some(handle) = worker.handle.take() {
+            let _ = handle.join();
+        }
+    }
+    lock(&shared.state).outq.end();
 }
 
 fn threaded_input_possible(coder: &StreamDecoderMt, shared: &DecoderSharedState) -> bool {
@@ -628,15 +642,20 @@ impl StreamDecoderMt {
                 cond: Condvar::new(),
             });
 
-            let handle = thread::Builder::new()
+            let handle = match thread::Builder::new()
                 .name(format!("lzma-dec-mt-{worker_id}"))
                 .spawn({
                     let shared = shared.clone();
                     let worker = worker_shared.clone();
                     let allocator = AllocatorPtr(allocator);
                     move || decoder_worker_loop(worker_id, allocator, shared, worker)
-                })
-                .map_err(|_| crate::ffi::types::LZMA_MEM_ERROR)?;
+                }) {
+                Ok(handle) => handle,
+                Err(_) => {
+                    shutdown_decoder_workers(&shared, &mut workers);
+                    return Err(crate::ffi::types::LZMA_MEM_ERROR);
+                }
+            };
 
             workers.push(DecoderWorker {
                 shared: worker_shared,
@@ -682,7 +701,12 @@ impl StreamDecoderMt {
             coder.memlimit_threading = coder.memlimit_stop;
         }
 
-        coder.reset_stream(allocator)?;
+        if let Err(ret) = coder.reset_stream(allocator) {
+            shutdown_decoder_workers(&coder.shared, &mut coder.workers);
+            filter::filters_free_impl(coder.filters.as_mut_ptr(), allocator);
+            index_hash_end(coder.index_hash, allocator);
+            return Err(ret);
+        }
         Ok(coder)
     }
 
@@ -1429,13 +1453,7 @@ unsafe fn decoder_code(
 
 unsafe fn decoder_end(coder: *mut c_void, allocator: *const lzma_allocator) {
     let mut coder = Box::from_raw(coder.cast::<StreamDecoderMt>());
-    abort_workers(&coder);
-    for worker in &mut coder.workers {
-        if let Some(handle) = worker.handle.take() {
-            let _ = handle.join();
-        }
-    }
-    lock(&coder.shared.state).outq.end();
+    shutdown_decoder_workers(&coder.shared, &mut coder.workers);
     if let Some(direct) = coder.direct.take() {
         if let DirectDecoder::Streaming { mut inner } = direct {
             lzma_end_impl(&mut inner);
@@ -1493,6 +1511,7 @@ pub(crate) unsafe fn stream_decoder_mt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
 
     use crate::ffi::types::{lzma_filter, lzma_options_lzma};
     use crate::internal::{
@@ -2254,5 +2273,67 @@ mod tests {
             assert_eq!(decoded, input);
             lzma_end_impl(&mut strm);
         }
+    }
+
+    #[test]
+    fn shutdown_decoder_workers_joins_running_threads() {
+        let shared = Arc::new(DecoderShared {
+            state: Mutex::new(DecoderSharedState {
+                outq: OutQueue::default(),
+                free_workers: Vec::new(),
+                thread_error: LZMA_OK,
+                progress_in: 0,
+                progress_out: 0,
+                mem_in_use: 0,
+            }),
+            cond: Condvar::new(),
+        });
+        lock(&shared.state).outq.init(2).unwrap();
+
+        let (tx, rx) = mpsc::channel();
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let worker_shared = Arc::new(DecoderWorkerShared {
+                state: Mutex::new(DecoderWorkerState {
+                    command: DecoderCommand::Idle,
+                    input: Vec::new(),
+                    in_size: 0,
+                    in_filled: 0,
+                    outbuf: None,
+                    job: None,
+                    progress_in: 0,
+                    progress_out: 0,
+                    partial: PartialMode::Disabled,
+                    poisoned: false,
+                }),
+                cond: Condvar::new(),
+            });
+            let tx = tx.clone();
+            let worker = worker_shared.clone();
+            let handle = thread::spawn(move || {
+                let mut state = lock(&worker.state);
+                while state.command == DecoderCommand::Idle {
+                    state = worker
+                        .cond
+                        .wait(state)
+                        .unwrap_or_else(|poison| poison.into_inner());
+                }
+                assert!(matches!(state.command, DecoderCommand::Exit));
+                drop(state);
+                tx.send(()).unwrap();
+            });
+            workers.push(DecoderWorker {
+                shared: worker_shared,
+                handle: Some(handle),
+            });
+        }
+        drop(tx);
+
+        shutdown_decoder_workers(&shared, &mut workers);
+
+        for _ in 0..2 {
+            rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        }
+        assert!(workers.iter().all(|worker| worker.handle.is_none()));
     }
 }

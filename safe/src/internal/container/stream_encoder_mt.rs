@@ -646,7 +646,7 @@ impl StreamEncoderMt {
                 cond: Condvar::new(),
             });
 
-            let handle = thread::Builder::new()
+            let handle = match thread::Builder::new()
                 .name(format!("lzma-enc-mt-{worker_id}"))
                 .spawn({
                     let shared = shared.clone();
@@ -663,8 +663,13 @@ impl StreamEncoderMt {
                             worker,
                         );
                     }
-                })
-                .map_err(|_| LZMA_MEM_ERROR)?;
+                }) {
+                Ok(handle) => handle,
+                Err(_) => {
+                    shutdown_encoder_workers(&shared, &mut workers);
+                    return Err(LZMA_MEM_ERROR);
+                }
+            };
 
             workers.push(EncoderWorker {
                 shared: worker_shared,
@@ -959,6 +964,22 @@ impl StreamEncoderMt {
     }
 }
 
+fn shutdown_encoder_workers(shared: &Arc<EncoderShared>, workers: &mut [EncoderWorker]) {
+    for worker in workers.iter() {
+        let mut state = lock(&worker.shared.state);
+        state.command = EncoderCommand::Exit;
+        worker.shared.cond.notify_all();
+    }
+
+    for worker in workers.iter_mut() {
+        if let Some(handle) = worker.handle.take() {
+            let _ = handle.join();
+        }
+    }
+
+    lock(&shared.state).outq.end();
+}
+
 unsafe fn encoder_code(
     coder: *mut c_void,
     _allocator: *const lzma_allocator,
@@ -976,19 +997,7 @@ unsafe fn encoder_code(
 
 unsafe fn encoder_end(coder: *mut c_void, _allocator: *const lzma_allocator) {
     let mut coder = Box::from_raw(coder.cast::<StreamEncoderMt>());
-    for worker in &coder.workers {
-        let mut state = lock(&worker.shared.state);
-        state.command = EncoderCommand::Exit;
-        worker.shared.cond.notify_all();
-    }
-
-    for worker in &mut coder.workers {
-        if let Some(handle) = worker.handle.take() {
-            let _ = handle.join();
-        }
-    }
-
-    lock(&coder.shared.state).outq.end();
+    shutdown_encoder_workers(&coder.shared, &mut coder.workers);
 }
 
 unsafe fn encoder_get_progress(coder: *mut c_void, progress_in: *mut u64, progress_out: *mut u64) {
@@ -1097,6 +1106,8 @@ pub(crate) unsafe fn stream_encoder_mt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+
     use crate::ffi::types::{lzma_filter, LZMA_STREAM_INIT};
     use crate::internal::{
         common::LZMA_CHECK_CRC32, container::stream, filter::common::LZMA_FILTER_LZMA2,
@@ -1247,5 +1258,65 @@ mod tests {
             let mut enc = LZMA_STREAM_INIT;
             assert_eq!(stream_encoder_mt(&mut enc, ptr::null()), LZMA_PROG_ERROR);
         }
+    }
+
+    #[test]
+    fn shutdown_encoder_workers_joins_running_threads() {
+        let shared = Arc::new(EncoderShared {
+            state: Mutex::new(EncoderSharedState {
+                outq: OutQueue::default(),
+                free_workers: Vec::new(),
+                thread_error: LZMA_OK,
+                progress_in: 0,
+                progress_out: 0,
+            }),
+            cond: Condvar::new(),
+        });
+        lock(&shared.state).outq.init(2).unwrap();
+
+        let (tx, rx) = mpsc::channel();
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let worker_shared = Arc::new(EncoderWorkerShared {
+                state: Mutex::new(EncoderWorkerState {
+                    command: EncoderCommand::Idle,
+                    input: Vec::new(),
+                    in_size: 0,
+                    outbuf: None,
+                    filters: None,
+                    progress_in: 0,
+                    progress_out: 0,
+                }),
+                progress_in: AtomicU64::new(0),
+                progress_out: AtomicU64::new(0),
+                cond: Condvar::new(),
+            });
+            let tx = tx.clone();
+            let worker = worker_shared.clone();
+            let handle = thread::spawn(move || {
+                let mut state = lock(&worker.state);
+                while state.command == EncoderCommand::Idle {
+                    state = worker
+                        .cond
+                        .wait(state)
+                        .unwrap_or_else(|poison| poison.into_inner());
+                }
+                assert!(matches!(state.command, EncoderCommand::Exit));
+                drop(state);
+                tx.send(()).unwrap();
+            });
+            workers.push(EncoderWorker {
+                shared: worker_shared,
+                handle: Some(handle),
+            });
+        }
+        drop(tx);
+
+        shutdown_encoder_workers(&shared, &mut workers);
+
+        for _ in 0..2 {
+            rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        }
+        assert!(workers.iter().all(|worker| worker.handle.is_none()));
     }
 }
