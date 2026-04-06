@@ -15,7 +15,6 @@ use std::io::{self, Seek, SeekFrom};
 pub use reader::XzReader;
 #[cfg(feature = "std")]
 pub use reader_mt::XzReaderMt;
-use sha2::Digest;
 #[cfg(feature = "encoder")]
 pub use writer::{XzOptions, XzWriter};
 #[cfg(all(feature = "encoder", feature = "std"))]
@@ -25,6 +24,7 @@ use crate::{
     ByteReader, Read,
     crc::{Crc32, Crc64},
     error_invalid_data, error_invalid_input,
+    sha256::Sha256State,
 };
 #[cfg(feature = "encoder")]
 use crate::{ByteWriter, Write};
@@ -739,7 +739,7 @@ enum ChecksumCalculator {
     None,
     Crc32(Crc32),
     Crc64(Crc64),
-    Sha256(sha2::Sha256),
+    Sha256(Sha256State),
 }
 
 impl ChecksumCalculator {
@@ -748,7 +748,7 @@ impl ChecksumCalculator {
             CheckType::None => Self::None,
             CheckType::Crc32 => Self::Crc32(Crc32::new()),
             CheckType::Crc64 => Self::Crc64(Crc64::new()),
-            CheckType::Sha256 => Self::Sha256(sha2::Sha256::new()),
+            CheckType::Sha256 => Self::Sha256(Sha256State::new()),
         }
     }
 
@@ -807,7 +807,7 @@ impl ChecksumCalculator {
                     return false;
                 }
 
-                let final_sha = sha.finalize();
+                let final_sha = sha.finish();
 
                 &final_sha[..32] == expected
             }
@@ -820,7 +820,7 @@ impl ChecksumCalculator {
             ChecksumCalculator::None => Vec::new(),
             ChecksumCalculator::Crc32(crc) => crc.finalize().to_le_bytes().to_vec(),
             ChecksumCalculator::Crc64(crc) => crc.finalize().to_le_bytes().to_vec(),
-            ChecksumCalculator::Sha256(sha) => sha.finalize().to_vec(),
+            ChecksumCalculator::Sha256(sha) => sha.finish().to_vec(),
         }
     }
 }

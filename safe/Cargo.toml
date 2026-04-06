@@ -14,16 +14,7 @@ libc = "0.2"
 lzma-rust2 = { path = "vendor/lzma-rust2", default-features = false, features = ["std", "encoder", "lzip", "xz"] }
 
 [patch.crates-io]
-block-buffer = { path = "vendor/block-buffer-0.10.4" }
-cfg-if = { path = "vendor/cfg-if-1.0.4" }
-cpufeatures = { path = "vendor/cpufeatures-0.2.17" }
-crypto-common = { path = "vendor/crypto-common-0.1.7" }
-digest = { path = "vendor/digest-0.10.7" }
-generic-array = { path = "vendor/generic-array-0.14.7" }
 libc = { path = "vendor/libc-0.2.184" }
-sha2 = { path = "vendor/sha2-0.10.9" }
-typenum = { path = "vendor/typenum-1.19.0" }
-version_check = { path = "vendor/version_check-0.9.5" }
 
 [profile.dev]
 panic = "abort"

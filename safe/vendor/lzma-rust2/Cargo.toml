@@ -51,12 +51,8 @@ encoder = []
 lzip = []
 optimization = []
 std = []
-xz = ["sha2"]
+xz = []
 
 [lib]
 name = "lzma_rust2"
 path = "src/lib.rs"
-
-[dependencies.sha2]
-version = "0.10"
-optional = true

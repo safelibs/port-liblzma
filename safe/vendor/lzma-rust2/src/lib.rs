@@ -62,6 +62,8 @@ mod lzip;
 mod lzma2_reader;
 mod lzma_reader;
 mod range_dec;
+#[cfg(feature = "xz")]
+mod sha256;
 mod state;
 #[cfg(feature = "std")]
 mod work_queue;

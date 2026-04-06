@@ -3,57 +3,12 @@
 version = 4
 
 [[package]]
-name = "block-buffer"
-version = "0.10.4"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
-name = "cfg-if"
-version = "1.0.4"
-
-[[package]]
-name = "cpufeatures"
-version = "0.2.17"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "crypto-common"
-version = "0.1.7"
-dependencies = [
- "generic-array",
- "typenum",
-]
-
-[[package]]
-name = "digest"
-version = "0.10.7"
-dependencies = [
- "block-buffer",
- "crypto-common",
-]
-
-[[package]]
-name = "generic-array"
-version = "0.14.7"
-dependencies = [
- "typenum",
- "version_check",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.184"
 
 [[package]]
 name = "lzma-rust2"
 version = "0.16.2"
-dependencies = [
- "sha2",
-]
 
 [[package]]
 name = "safe-liblzma"
@@ -62,20 +17,3 @@ dependencies = [
  "libc",
  "lzma-rust2",
 ]
-
-[[package]]
-name = "sha2"
-version = "0.10.9"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest",
-]
-
-[[package]]
-name = "typenum"
-version = "1.19.0"
-
-[[package]]
-name = "version_check"
-version = "0.9.5"

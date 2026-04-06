@@ -16,6 +16,7 @@ default_aliases_obj="$compat_dir/linux_symver_defaults.o"
 compat_aliases="$compat_dir/linux_symver_compat.S"
 compat_aliases_obj="$compat_dir/linux_symver_compat.o"
 compat_alias_args=()
+archive_rewrite_dir="$compat_dir/archive-rewrite"
 
 split_flags() {
   local value="$1"
@@ -115,7 +116,26 @@ lzma_stream_encoder_mt_memusage __safe_impl_lzma_stream_encoder_mt_memusage
 EOF
 
 cp "$static_lib" "$compat_archive"
-objcopy --redefine-syms="$redefine_syms" "$compat_archive"
+if ! objcopy --redefine-syms="$redefine_syms" "$compat_archive" 2>/dev/null; then
+  rm -rf "$archive_rewrite_dir"
+  mkdir -p "$archive_rewrite_dir"
+
+  mapfile -t archive_members < <(ar t "$compat_archive")
+  (
+    cd "$archive_rewrite_dir"
+    ar x "$compat_archive"
+
+    for member in "${archive_members[@]}"; do
+      if nm -g --defined-only "$member" 2>/dev/null | grep -Eq \
+        ' T lzma_(block_uncomp_encode|cputhreads|get_progress|stream_encoder_mt|stream_encoder_mt_memusage)$'; then
+        objcopy --redefine-syms="$redefine_syms" "$member"
+      fi
+    done
+
+    rm -f "$compat_archive"
+    ar crs "$compat_archive" "${archive_members[@]}"
+  )
+fi
 
 cat > "$default_aliases" <<'EOF'
     .text

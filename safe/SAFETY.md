@@ -14,6 +14,8 @@ The allowed remaining `unsafe` categories are:
 
 The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detection stays on the safe side of the standard library.
 
+The shipped Rust dependency graph is intentionally small: `safe-liblzma`, vendored `libc`, and vendored `lzma-rust2`. The previous `sha2` -> `digest` -> `generic-array` chain was removed from the active build so no third-party crate with non-audited `unsafe` remains in the compiled dependency graph.
+
 ## Invariants
 
 - Every exported `lzma_*` entrypoint treats all caller pointers as untrusted until null, size, and state checks have run.
@@ -65,6 +67,7 @@ The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detect
 ## What This Audit Removed
 
 - Cargo-driven release and package builds now run `--offline --locked`.
+- The XZ SHA-256 checksum path in vendored `lzma-rust2` now uses a local safe implementation, removing the `sha2` and `generic-array` dependency chain from shipped builds.
 - The multithreaded workers now receive owned filter handles and opaque allocator addresses, removing the previous marker-trait exemption.
 - Stale Rust re-exports that were generating warning noise were removed so the hardening gate is easier to interpret.
 
