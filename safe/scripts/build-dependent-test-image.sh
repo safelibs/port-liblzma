@@ -4,7 +4,8 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 safe_dir="$(cd -- "$script_dir/.." && pwd)"
 repo_root="$(cd -- "$safe_dir/.." && pwd)"
-dockerfile="$safe_dir/docker/dependent-test.Dockerfile"
+tracked_dockerfile_relative="safe/docker/dependent-test.Dockerfile"
+dockerfile="$repo_root/$tracked_dockerfile_relative"
 default_safe_package_dir="$safe_dir/dist"
 implementation="original"
 safe_package_dir="$default_safe_package_dir"
@@ -79,7 +80,7 @@ command -v docker >/dev/null 2>&1 || {
 }
 
 [[ -f "$dockerfile" ]] || {
-  printf 'missing tracked Dockerfile: %s\n' "$dockerfile" >&2
+  printf 'missing tracked Dockerfile: %s\n' "$tracked_dockerfile_relative" >&2
   exit 1
 }
 
