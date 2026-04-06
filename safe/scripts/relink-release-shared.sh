@@ -16,9 +16,29 @@ default_aliases_obj="$compat_dir/linux_symver_defaults.o"
 compat_aliases="$compat_dir/linux_symver_compat.S"
 compat_aliases_obj="$compat_dir/linux_symver_compat.o"
 
+split_flags() {
+  local value="$1"
+  local -n out_ref="$2"
+
+  out_ref=()
+  if [[ -n "$value" ]]; then
+    # Debian passes compiler/linker flags through the environment.
+    read -r -a out_ref <<<"$value"
+  fi
+}
+
+cppflags=()
+cflags=()
+ldflags=()
+split_flags "${CPPFLAGS:-}" cppflags
+split_flags "${CFLAGS:-}" cflags
+split_flags "${LDFLAGS:-}" ldflags
+
 mkdir -p "$compat_dir"
 
-cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
+if [[ "${LIBLZMA_SKIP_CARGO_BUILD:-0}" != "1" ]]; then
+  cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
+fi
 
 REPO_ROOT="$repo_root" python3 - <<'PY'
 import os
@@ -117,7 +137,7 @@ cat > "$default_aliases" <<'EOF'
     .section .note.GNU-stack,"",@progbits
 EOF
 
-cc -fPIC -c "$default_aliases" -o "$default_aliases_obj"
+cc "${cppflags[@]}" "${cflags[@]}" -fPIC -c "$default_aliases" -o "$default_aliases_obj"
 
 cat > "$compat_aliases" <<'EOF'
     .text
@@ -143,9 +163,11 @@ cat > "$compat_aliases" <<'EOF'
     .section .note.GNU-stack,"",@progbits
 EOF
 
-cc -fPIC -c "$compat_aliases" -o "$compat_aliases_obj"
+cc "${cppflags[@]}" "${cflags[@]}" -fPIC -c "$compat_aliases" -o "$compat_aliases_obj"
 
 cc -shared \
+  "${cflags[@]}" \
+  "${ldflags[@]}" \
   -o "$shared_lib" \
   "$default_aliases_obj" \
   "$compat_aliases_obj" \

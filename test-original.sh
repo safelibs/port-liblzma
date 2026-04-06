@@ -4,16 +4,21 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_TAG="${LIBLZMA_ORIGINAL_TEST_IMAGE:-liblzma-original-test:ubuntu24.04}"
 ONLY=""
+IMPLEMENTATION="original"
+DEFAULT_SAFE_PACKAGE_DIR="$ROOT/safe/dist"
+SAFE_PACKAGE_DIR="$DEFAULT_SAFE_PACKAGE_DIR"
 
 usage() {
   cat <<'EOF'
-usage: test-original.sh [--only <binary-package>]
+usage: test-original.sh [--only <binary-package>] [--implementation <original|safe>] [--safe-package-dir <dir>]
 
-Builds and installs the vendored original liblzma inside Docker, then smoke-tests
-the Ubuntu 24.04 dependent packages recorded in dependents.json against that
-local liblzma build.
+Builds and tests either the vendored original liblzma or the packaged safe
+replacement inside Docker, then smoke-tests the Ubuntu 24.04 dependent
+packages recorded in dependents.json against the selected implementation.
 
 --only runs just one dependent by exact .dependents[].binary_package.
+--implementation defaults to original.
+--safe-package-dir defaults to safe/dist.
 EOF
 }
 
@@ -21,6 +26,14 @@ while (($#)); do
   case "$1" in
     --only)
       ONLY="${2:?missing value for --only}"
+      shift 2
+      ;;
+    --implementation)
+      IMPLEMENTATION="${2:?missing value for --implementation}"
+      shift 2
+      ;;
+    --safe-package-dir)
+      SAFE_PACKAGE_DIR="${2:?missing value for --safe-package-dir}"
       shift 2
       ;;
     --help|-h)
@@ -34,6 +47,20 @@ while (($#)); do
       ;;
   esac
 done
+
+case "$IMPLEMENTATION" in
+  original|safe)
+    ;;
+  *)
+    printf 'unknown implementation: %s\n' "$IMPLEMENTATION" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+
+if [[ "$SAFE_PACKAGE_DIR" != /* ]]; then
+  SAFE_PACKAGE_DIR="$ROOT/$SAFE_PACKAGE_DIR"
+fi
 
 for tool in docker python3; do
   command -v "$tool" >/dev/null 2>&1 || {
@@ -84,6 +111,40 @@ if only and only not in set(actual):
     raise SystemExit(f"unknown --only binary package: {only}")
 PY
 
+prepare_safe_packages() {
+  local build_dir="$DEFAULT_SAFE_PACKAGE_DIR"
+  local artifacts=()
+
+  "$ROOT/safe/scripts/build-deb.sh" >/tmp/liblzma-safe-build-deb.log 2>&1 || {
+    cat /tmp/liblzma-safe-build-deb.log >&2
+    exit 1
+  }
+
+  if [[ "$SAFE_PACKAGE_DIR" == "$build_dir" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$SAFE_PACKAGE_DIR"
+  rm -f \
+    "$SAFE_PACKAGE_DIR"/liblzma5_*.deb \
+    "$SAFE_PACKAGE_DIR"/liblzma-dev_*.deb \
+    "$SAFE_PACKAGE_DIR"/liblzma-safe_*.buildinfo \
+    "$SAFE_PACKAGE_DIR"/liblzma-safe_*.changes
+
+  artifacts=(
+    "$build_dir"/liblzma5_*.deb
+    "$build_dir"/liblzma-dev_*.deb
+    "$build_dir"/liblzma-safe_*.buildinfo
+    "$build_dir"/liblzma-safe_*.changes
+  )
+
+  cp -f "${artifacts[@]}" "$SAFE_PACKAGE_DIR"/
+}
+
+if [[ "$IMPLEMENTATION" == "safe" ]]; then
+  prepare_safe_packages
+fi
+
 docker build -t "$IMAGE_TAG" - <<'DOCKERFILE'
 FROM ubuntu:24.04
 
@@ -116,13 +177,29 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 DOCKERFILE
 
-docker run --rm -i \
-  --cap-add SYS_PTRACE \
-  --security-opt seccomp=unconfined \
-  -e "LIBLZMA_TEST_ONLY=$ONLY" \
-  -v "$ROOT:/work:ro" \
-  "$IMAGE_TAG" \
-  bash -s <<'CONTAINER'
+docker_run_args=(
+  --rm
+  -i
+  --cap-add
+  SYS_PTRACE
+  --security-opt
+  seccomp=unconfined
+  -e
+  "LIBLZMA_TEST_ONLY=$ONLY"
+  -e
+  "LIBLZMA_IMPLEMENTATION=$IMPLEMENTATION"
+  -v
+  "$ROOT:/work:ro"
+)
+
+if [[ "$IMPLEMENTATION" == "safe" ]]; then
+  docker_run_args+=(
+    -v
+    "$SAFE_PACKAGE_DIR:/safe-packages:ro"
+  )
+fi
+
+docker run "${docker_run_args[@]}" "$IMAGE_TAG" bash -s <<'CONTAINER'
 set -Eeuo pipefail
 
 export LANG=C.UTF-8
@@ -130,6 +207,7 @@ export LC_ALL=C.UTF-8
 export DEBIAN_FRONTEND=noninteractive
 
 READ_ONLY_ROOT=/work
+IMPLEMENTATION="${LIBLZMA_IMPLEMENTATION:-original}"
 SOURCE_ROOT=/tmp/liblzma-original
 BUILD_ROOT=/tmp/liblzma-build
 TEST_ROOT=/tmp/liblzma-dependent-tests
@@ -248,11 +326,38 @@ build_original_liblzma() {
   printf '/usr/local/lib\n' >/etc/ld.so.conf.d/000-local-liblzma.conf
   ldconfig
 
-  export LD_LIBRARY_PATH="/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 
   ACTIVE_LIBLZMA="$(readlink -f /usr/local/lib/liblzma.so.5)"
   [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to install local liblzma shared library"
+  cd /
+}
+
+install_safe_liblzma_packages() {
+  local runtime_pkg
+  local dev_pkg
+
+  CURRENT_STEP="install safe liblzma Debian packages"
+  log_step "Installing safe liblzma Debian packages"
+
+  rm -rf "$TEST_ROOT"
+  mkdir -p "$TEST_ROOT"
+
+  runtime_pkg=(/safe-packages/liblzma5_*.deb)
+  dev_pkg=(/safe-packages/liblzma-dev_*.deb)
+  [[ -f "${runtime_pkg[0]}" ]] || die "missing mounted liblzma5 package"
+  [[ -f "${dev_pkg[0]}" ]] || die "missing mounted liblzma-dev package"
+
+  dpkg -i "${runtime_pkg[0]}" "${dev_pkg[0]}" >/tmp/liblzma-safe-dpkg.log 2>&1
+  apt-get install -f -y --no-install-recommends >/tmp/liblzma-safe-apt-fix.log 2>&1
+  ldconfig
+
+  unset LD_LIBRARY_PATH
+  unset PKG_CONFIG_PATH
+
+  ACTIVE_LIBLZMA="$(readlink -f "/usr/lib/${MULTIARCH}/liblzma.so.5")"
+  [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to install packaged liblzma shared library"
   cd /
 }
 
@@ -734,7 +839,17 @@ EOF
   require_contains "$dir/boost.log" "boost lzma ok"
 }
 
-build_original_liblzma
+case "$IMPLEMENTATION" in
+  original)
+    build_original_liblzma
+    ;;
+  safe)
+    install_safe_liblzma_packages
+    ;;
+  *)
+    die "unsupported implementation inside container: $IMPLEMENTATION"
+    ;;
+esac
 
 should_run "dpkg" && test_dpkg
 should_run "apt" && test_apt

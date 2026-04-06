@@ -1,0 +1,74 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+LIBLZMA_PUBLIC_VERSION := $(shell awk '/#define LZMA_VERSION_MAJOR/{major=$$3} /#define LZMA_VERSION_MINOR/{minor=$$3} /#define LZMA_VERSION_PATCH/{patch=$$3} END { printf "%s.%s.%s", major, minor, patch }' $(CURDIR)/include/lzma/version.h)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	mkdir -p "$(CARGO_HOME)"
+	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --release
+	LIBLZMA_SKIP_CARGO_BUILD=1 "$(CURDIR)/scripts/relink-release-shared.sh"
+	sed \
+		-e 's|@prefix@|/usr|g' \
+		-e 's|@exec_prefix@|/usr|g' \
+		-e "s|@libdir@|/usr/lib/$(DEB_HOST_MULTIARCH)|g" \
+		-e 's|@includedir@|/usr/include|g' \
+		-e 's|@PACKAGE_URL@|https://tukaani.org/xz/|g' \
+		-e 's|@PACKAGE_VERSION@|$(LIBLZMA_PUBLIC_VERSION)|g' \
+		-e 's|@PTHREAD_CFLAGS@|-pthread|g' \
+		-e 's|@LIBS@|-lpthread|g' \
+		"$(CURDIR)/liblzma.pc.in" >"$(CURDIR)/target/release/liblzma.pc"
+
+override_dh_auto_install:
+	mkdir -p "$(CARGO_HOME)"
+	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --release
+	LIBLZMA_SKIP_CARGO_BUILD=1 "$(CURDIR)/scripts/relink-release-shared.sh"
+	sed \
+		-e 's|@prefix@|/usr|g' \
+		-e 's|@exec_prefix@|/usr|g' \
+		-e "s|@libdir@|/usr/lib/$(DEB_HOST_MULTIARCH)|g" \
+		-e 's|@includedir@|/usr/include|g' \
+		-e 's|@PACKAGE_URL@|https://tukaani.org/xz/|g' \
+		-e 's|@PACKAGE_VERSION@|$(LIBLZMA_PUBLIC_VERSION)|g' \
+		-e 's|@PTHREAD_CFLAGS@|-pthread|g' \
+		-e 's|@LIBS@|-lpthread|g' \
+		"$(CURDIR)/liblzma.pc.in" >"$(CURDIR)/target/release/liblzma.pc"
+	rm -rf "$(CURDIR)/debian/tmp"
+	install -d \
+		"$(CURDIR)/debian/tmp/usr/include/lzma" \
+		"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig" \
+		"$(CURDIR)/debian/tmp/usr/share/doc/xz"
+	install -m 0644 "$(CURDIR)/target/release/liblzma.so" \
+		"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/liblzma.so.5.4.5"
+	ln -sf "liblzma.so.5.4.5" \
+		"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/liblzma.so.5"
+	ln -sf "liblzma.so.5.4.5" \
+		"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/liblzma.so"
+	if [ -f "$(CURDIR)/target/release/liblzma.a" ]; then \
+		install -m 0644 "$(CURDIR)/target/release/liblzma.a" \
+			"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/liblzma.a"; \
+	fi
+	install -m 0644 "$(CURDIR)/target/release/liblzma.pc" \
+		"$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/liblzma.pc"
+	install -m 0644 "$(CURDIR)/include/lzma.h" \
+		"$(CURDIR)/debian/tmp/usr/include/lzma.h"
+	install -m 0644 "$(CURDIR)/include/lzma/"*.h \
+		"$(CURDIR)/debian/tmp/usr/include/lzma/"
+	install -m 0644 "$(CURDIR)/../original/AUTHORS" \
+		"$(CURDIR)/debian/tmp/usr/share/doc/xz/AUTHORS"
+	install -m 0644 "$(CURDIR)/../original/THANKS" \
+		"$(CURDIR)/debian/tmp/usr/share/doc/xz/THANKS"
+	install -m 0644 "$(CURDIR)/../original/NEWS" \
+		"$(CURDIR)/debian/tmp/usr/share/doc/xz/NEWS"
+
+override_dh_auto_test:
+	:
+
+override_dh_makeshlibs:
+	dh_makeshlibs -pliblzma5
