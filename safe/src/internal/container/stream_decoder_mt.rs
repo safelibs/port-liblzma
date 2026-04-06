@@ -1173,19 +1173,20 @@ impl StreamDecoderMt {
                                     input.add(*in_pos),
                                     in_size - *in_pos,
                                 );
-                                let (decoded, consumed) =
-                                    match crate::internal::lzma::decode_raw(&buffered.chain, input_slice)
-                                    {
-                                        Ok(result) => result,
-                                        Err(crate::ffi::types::LZMA_BUF_ERROR) => return LZMA_OK,
-                                        Err(ret) => return ret,
-                                    };
+                                let (decoded, consumed) = match crate::internal::lzma::decode_raw(
+                                    &buffered.chain,
+                                    input_slice,
+                                ) {
+                                    Ok(result) => result,
+                                    Err(crate::ffi::types::LZMA_BUF_ERROR) => return LZMA_OK,
+                                    Err(ret) => return ret,
+                                };
 
                                 let padding = (4usize.wrapping_sub(consumed & 3)) & 3;
-                                let check_size = check::check_size(self.block_options.check) as usize;
-                                let total = consumed
-                                    .saturating_add(padding)
-                                    .saturating_add(check_size);
+                                let check_size =
+                                    check::check_size(self.block_options.check) as usize;
+                                let total =
+                                    consumed.saturating_add(padding).saturating_add(check_size);
                                 if input_slice.len() < total {
                                     return LZMA_OK;
                                 }
@@ -1197,17 +1198,19 @@ impl StreamDecoderMt {
                                 }
 
                                 let check_start = consumed + padding;
-                                self.block_options.raw_check[..check_size]
-                                    .copy_from_slice(&input_slice[check_start..check_start + check_size]);
-                                let ignore_check =
-                                    self.block_options.version >= 1 && self.block_options.ignore_check != 0;
-                                let verify_check =
-                                    !ignore_check && check::check_is_supported(self.block_options.check) != 0;
+                                self.block_options.raw_check[..check_size].copy_from_slice(
+                                    &input_slice[check_start..check_start + check_size],
+                                );
+                                let ignore_check = self.block_options.version >= 1
+                                    && self.block_options.ignore_check != 0;
+                                let verify_check = !ignore_check
+                                    && check::check_is_supported(self.block_options.check) != 0;
                                 if verify_check {
-                                    let mut state = match check::CheckState::new(self.block_options.check) {
-                                        Some(state) => state,
-                                        None => return LZMA_OPTIONS_ERROR,
-                                    };
+                                    let mut state =
+                                        match check::CheckState::new(self.block_options.check) {
+                                            Some(state) => state,
+                                            None => return LZMA_OPTIONS_ERROR,
+                                        };
                                     state.update(&decoded);
                                     if state.finish()[..check_size]
                                         != self.block_options.raw_check[..check_size]
@@ -1216,8 +1219,15 @@ impl StreamDecoderMt {
                                     }
                                 }
 
+                                let decoded_len = decoded.len() as u64;
+                                if self.block_options.uncompressed_size != LZMA_VLI_UNKNOWN
+                                    && self.block_options.uncompressed_size != decoded_len
+                                {
+                                    return LZMA_DATA_ERROR;
+                                }
+
                                 self.block_options.compressed_size = consumed as u64;
-                                self.block_options.uncompressed_size = decoded.len() as u64;
+                                self.block_options.uncompressed_size = decoded_len;
                                 buffered.decoded = decoded;
                                 buffered.decoded_pos = 0;
                                 buffered.consumed = total;
@@ -1563,6 +1573,40 @@ mod tests {
         encoded[payload_pos] = 0x03;
     }
 
+    unsafe fn set_first_block_uncompressed_size(
+        encoded: &mut [u8],
+        check: crate::ffi::types::lzma_check,
+        uncompressed_size: u64,
+    ) {
+        let block_start = LZMA_STREAM_HEADER_SIZE;
+        let mut decoded_filters = [lzma_filter {
+            id: LZMA_VLI_UNKNOWN,
+            options: ptr::null_mut(),
+        }; crate::ffi::types::LZMA_FILTERS_MAX + 1];
+        let mut block_options: lzma_block = mem::zeroed();
+        block_options.version = 1;
+        block_options.check = check;
+        block_options.header_size = ((encoded[block_start] as u32) + 1) * 4;
+        block_options.filters = decoded_filters.as_mut_ptr();
+
+        let decode_ret = block::block_header_decode(
+            &mut block_options,
+            ptr::null(),
+            encoded.as_ptr().add(block_start),
+        );
+        if decode_ret != LZMA_OK {
+            filter::filters_free_impl(decoded_filters.as_mut_ptr(), ptr::null());
+        }
+        assert_eq!(decode_ret, LZMA_OK);
+        assert_eq!(block_options.compressed_size, LZMA_VLI_UNKNOWN);
+
+        block_options.uncompressed_size = uncompressed_size;
+        let encode_ret =
+            block::block_header_encode(&block_options, encoded.as_mut_ptr().add(block_start));
+        filter::filters_free_impl(decoded_filters.as_mut_ptr(), ptr::null());
+        assert_eq!(encode_ret, LZMA_OK);
+    }
+
     unsafe fn decoder_from_stream(strm: *const lzma_stream) -> *const StreamDecoderMt {
         let next = current_next_coder(strm).expect("decoder should stay installed");
         next.coder.cast::<StreamDecoderMt>()
@@ -1761,7 +1805,10 @@ mod tests {
             strm.avail_out = out.len();
 
             assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_NO_CHECK);
-            assert_eq!(decoder_get_check(decoder_from_stream(&strm).cast()), crate::ffi::types::LZMA_CHECK_NONE);
+            assert_eq!(
+                decoder_get_check(decoder_from_stream(&strm).cast()),
+                crate::ffi::types::LZMA_CHECK_NONE
+            );
             assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_STREAM_END);
 
             lzma_end_impl(&mut strm);
@@ -1840,6 +1887,62 @@ mod tests {
                 );
             }
 
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn buffered_direct_unknown_compressed_rejects_wrong_header_uncompressed_size() {
+        unsafe {
+            let mut encoded = include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/upstream/files/good-1-check-none.xz"
+            ))
+            .to_vec();
+            set_first_block_uncompressed_size(&mut encoded, crate::ffi::types::LZMA_CHECK_NONE, 4);
+
+            let mt = lzma_mt {
+                flags: 0,
+                threads: 2,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+            strm.next_in = encoded.as_ptr();
+            strm.avail_in = encoded.len();
+
+            let mut ret = LZMA_OK;
+            for _ in 0..8 {
+                let mut out = [0u8; 64];
+                strm.next_out = out.as_mut_ptr();
+                strm.avail_out = out.len();
+                ret = lzma_code_impl(&mut strm, LZMA_FINISH);
+                if ret != LZMA_OK {
+                    break;
+                }
+            }
+
+            assert_eq!(ret, LZMA_DATA_ERROR);
             lzma_end_impl(&mut strm);
         }
     }
