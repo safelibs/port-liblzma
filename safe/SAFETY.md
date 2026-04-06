@@ -1,0 +1,87 @@
+# Safety Audit
+
+This phase audited the Rust `liblzma` port with two goals:
+
+1. Keep `unsafe` confined to the ABI and layout boundaries that the public `liblzma` contract makes unavoidable.
+2. Prove the shipped `safe/` artifacts are built from auditable, tracked source inputs and do not functionally depend on `original/`, `build/`, or `cmake-build/` implementation code.
+
+The allowed remaining `unsafe` categories are:
+
+- C ABI entrypoints and callback trampolines that must accept raw pointers and lengths from external callers.
+- Pointer translation between public `liblzma` C layouts and the internal Rust state that backs them.
+- Symbol-version alias shims for Linux ABI compatibility.
+- Narrow raw memory reads and writes where the C ABI requires byte-exact layout or caller-owned buffers.
+
+The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detection stays on the safe side of the standard library.
+
+## Invariants
+
+- Every exported `lzma_*` entrypoint treats all caller pointers as untrusted until null, size, and state checks have run.
+- Internal callbacks only mutate caller-owned buffers through the `(ptr, pos, size)` triplets that the C ABI already exposes.
+- Heap objects allocated through `lzma_allocator` are created and freed through the same allocator family.
+- Multithreaded encoder and decoder workers only receive deep-copied filter arrays or immutable allocator vtable pointers; they do not share mutable Rust references across threads.
+- The package build is expected to consume tracked files from `safe/` plus the non-code upstream documentation files `original/AUTHORS`, `original/NEWS`, and `original/THANKS`. `safe/scripts/release-verify.sh` traces this explicitly.
+
+## Remaining Unsafe Inventory
+
+| Path | Unsafe shape | Why it remains |
+| --- | --- | --- |
+| `safe/src/lib.rs` | `global_asm!` symver include | Linux ABI compatibility requires symbol-version alias shims that cannot be expressed in safe Rust. |
+| `safe/src/ffi/types.rs` | `unsafe extern "C" fn` pointer types in public structs | These are ABI declarations for allocator callbacks, not executable unsafe logic. |
+| `safe/src/ffi/stubs.rs` | Exported `pub unsafe extern "C" fn lzma_*` wrappers | Direct public C ABI entrypoints must accept raw pointers and forward them to the validated Rust implementation. |
+| `safe/src/internal/block/buffer.rs` | Raw block/header/buffer pointer handling | The block buffer APIs operate on caller-owned `lzma_block` state and byte buffers. |
+| `safe/src/internal/block/coder.rs` | Stream callback trampolines and coder state pointers | The stream-state ABI stores opaque coder pointers and invokes C-shaped callbacks. |
+| `safe/src/internal/block/header.rs` | Byte-wise header reads/writes and `lzma_block*` access | Block headers are C layout data structures encoded directly into caller buffers. |
+| `safe/src/internal/common.rs` | Allocator trampolines and raw zeroing/freeing | `lzma_allocator` is a C vtable and must be called through raw pointers. |
+| `safe/src/internal/container/alone.rs` | `.lzma` coder callbacks and stream-pointer mutation | The public container API is callback-driven and pointer-based. |
+| `safe/src/internal/container/auto.rs` | Auto-decoder callback forwarding | The wrapper dispatches through opaque inner coders supplied through the ABI. |
+| `safe/src/internal/container/easy.rs` | Easy encode/decode buffer entrypoints | The easy APIs accept raw filter, stream, and output buffer pointers from C callers. |
+| `safe/src/internal/container/lzip.rs` | Lzip decoder callback and output copies | The decoder fills caller-owned buffers and advances raw positions. |
+| `safe/src/internal/container/microlzma.rs` | Microlzma coder callbacks and output copies | Same ABI constraint as the single-stream coders above. |
+| `safe/src/internal/container/outqueue.rs` | Raw output-buffer copy helper | The queue drains into caller-provided `(out, out_pos, out_size)` buffers. |
+| `safe/src/internal/container/stream.rs` | Stream entrypoints and output copies | These are thin ABI shims over the stream coder core. |
+| `safe/src/internal/container/stream_buffer.rs` | Whole-buffer encode/decode entrypoints | The API shape is raw-pointer based by contract. |
+| `safe/src/internal/container/stream_encoder_mt.rs` | Stream-mt callbacks, worker handoff, `unsafe impl Send` | The threaded encoder must move deep-copied filter arrays and immutable allocator pointers into worker threads while preserving the C ABI lifetime rules. |
+| `safe/src/internal/container/stream_decoder_mt.rs` | Stream-mt callbacks, worker handoff, `unsafe impl Send` | Same justification as the threaded encoder, on the decoder side. |
+| `safe/src/internal/delta/common.rs` | Raw delta-option pointer reads | Delta options arrive as `lzma_options_delta*` from C callers. |
+| `safe/src/internal/filter/common.rs` | Filter-array copy/free/validate helpers | Public filter chains are raw C arrays terminated by `LZMA_VLI_UNKNOWN`. |
+| `safe/src/internal/filter/flags.rs` | Filter flag encode/decode over raw buffers | The filter flag format is a byte-level public ABI. |
+| `safe/src/internal/filter/properties.rs` | Option-struct access and property bytes | Filter property blobs are defined by the C API and require direct layout control. |
+| `safe/src/internal/filter/string_conv.rs` | Filter option parsing/stringification through raw option payloads | String conversion allocates and fills ABI-defined option records through raw pointers. |
+| `safe/src/internal/hardware.rs` | OS FFI calls for memory discovery | `sysconf`, `sysctlbyname`, and `GlobalMemoryStatusEx` are raw foreign interfaces. |
+| `safe/src/internal/index/core.rs` | Raw backing storage and ABI-compatible index layout translation | The index APIs expose opaque C pointers with upstream-compatible layout requirements. |
+| `safe/src/internal/index/decode.rs` | Index decoder callbacks and raw index allocation | The decoder owns opaque index state behind ABI pointers. |
+| `safe/src/internal/index/encode.rs` | Index encoder callbacks | The encoder is registered through the stream-state ABI callback table. |
+| `safe/src/internal/index/file_info.rs` | File-info decoder callback state and seek buffers | This API is callback-driven and mutates caller-owned positions and temporary buffers. |
+| `safe/src/internal/index/hash.rs` | Opaque hash pointer translation | The public hash object is passed around as an opaque C allocation. |
+| `safe/src/internal/index/iter.rs` | Iterator union field access and zero-init | The public iterator stores internal state in ABI-defined raw slots. |
+| `safe/src/internal/lzma/common.rs` | Filter-chain parsing from raw `lzma_filter*` | The parser has to reinterpret C-visible option payloads. |
+| `safe/src/internal/preset.rs` | In-place initialization of `lzma_options_lzma` | Preset application writes directly into caller-provided option structs. |
+| `safe/src/internal/simple/common.rs` | BCJ option pointer reads | BCJ options are optional C payload pointers. |
+| `safe/src/internal/stream_flags.rs` | Stream header/footer byte encoding | The on-wire stream flag format is defined at the byte level. |
+| `safe/src/internal/stream_state.rs` | Opaque `lzma_stream.internal` allocation and callback dispatch | The stream core stores Rust state behind the public C `internal` pointer. |
+| `safe/src/internal/upstream.rs` | Pointer-to-slice translation, raw buffer copies, callback trampolines | This bridge layer adapts the public ABI to the pure-Rust codec core. |
+| `safe/src/internal/vli.rs` | Direct VLI byte-buffer reads and writes | The VLI encode/decode API is explicitly buffer-and-position based. |
+
+## What This Audit Removed
+
+- Cargo-driven release and package builds now run `--offline --locked`.
+- The multithreaded `unsafe impl Send` sites are now documented inline where they occur.
+- Stale Rust re-exports that were generating warning noise were removed so the hardening gate is easier to interpret.
+
+## Performance Triage
+
+`safe/scripts/benchmark.sh` was run on 2026-04-05 against `build/src/liblzma/.libs/liblzma.so.5.4.5`.
+
+- `encode-text`: `0.228x` reference throughput
+- `encode-random`: `1.225x` reference throughput
+- `decode-text`: `0.151x` reference throughput
+- `decode-random`: `0.104x` reference throughput
+
+The benchmark gate intentionally reports these as visible warnings instead of a release-blocking failure. The regression is concentrated in codec hot paths, not in the package, ABI, or symbol-compatibility layers audited in this phase, and compatibility plus supply-chain hardening remained the higher-priority ship criteria for this port.
+
+## Verification Hooks
+
+- `safe/scripts/release-verify.sh` traces the package build, rejects forbidden implementation inputs, checks tracked/textual source provenance for the files the build actually consumes, compares installed headers and symbol maps to the authoritative upstream originals, and confirms the packaged library matches the freshly built Rust artifact.
+- `safe/fuzz/` contains a decode-focused harness with the same 300 MiB memory limit posture as the upstream OSS-Fuzz target.
+- `safe/scripts/benchmark.sh` compares the Rust library against `build/src/liblzma/.libs/liblzma.so.5.4.5` on representative encode and decode workloads so regressions are visible before release.

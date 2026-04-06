@@ -37,7 +37,7 @@ split_flags "${LDFLAGS:-}" ldflags
 mkdir -p "$compat_dir"
 
 if [[ "${LIBLZMA_SKIP_CARGO_BUILD:-0}" != "1" ]]; then
-  cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
+  cargo build --manifest-path "$safe_dir/Cargo.toml" --offline --locked --release >/dev/null
 fi
 
 REPO_ROOT="$repo_root" python3 - <<'PY'

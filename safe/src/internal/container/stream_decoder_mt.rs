@@ -42,6 +42,8 @@ fn lock<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
 #[derive(Copy, Clone)]
 struct AllocatorPtr(*const lzma_allocator);
 
+// Worker threads only borrow the allocator vtable while the owning stream is
+// alive; they never mutate the pointed-to allocator object.
 unsafe impl Send for AllocatorPtr {}
 
 struct OwnedFilters {
@@ -64,6 +66,8 @@ impl Drop for OwnedFilters {
     }
 }
 
+// Filter arrays are deep-copied before they cross the worker boundary, so each
+// worker owns and frees only its private copy.
 unsafe impl Send for OwnedFilters {}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -1152,6 +1156,10 @@ impl StreamDecoderMt {
                 }
 
                 DecoderSequence::BlockDirectRun => {
+                    if output.is_null() && out_size == 0 {
+                        return LZMA_OK;
+                    }
+
                     let direct = self.direct.as_mut().expect("direct decoder");
                     match direct {
                         DirectDecoder::Streaming { inner } => {
@@ -1486,6 +1494,17 @@ pub(crate) unsafe fn stream_decoder_mt(
 ) -> lzma_ret {
     if strm.is_null() {
         return LZMA_PROG_ERROR;
+    }
+
+    let options_ref = match options.as_ref() {
+        Some(options_ref) => options_ref,
+        None => return LZMA_PROG_ERROR,
+    };
+
+    // Upstream uses the mt entrypoint with one thread and zero threading
+    // memory to request single-threaded decoder semantics.
+    if options_ref.threads == 1 && options_ref.memlimit_threading == 0 {
+        return upstream::stream_decoder(strm, options_ref.memlimit_stop.max(1), options_ref.flags);
     }
 
     let coder = match StreamDecoderMt::new((*strm).allocator, options) {
@@ -1906,6 +1925,104 @@ mod tests {
                 );
             }
 
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn stream_decoder_mt_handles_xz_header_probe_without_output_buffer() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-1-delta-lzma2.tiff.xz"
+        ));
+        let mut expected = vec![0u8; 1 << 20];
+        let mut expected_in_pos = 0usize;
+        let mut expected_out_pos = 0usize;
+        let mut memlimit = u64::MAX;
+        unsafe {
+            assert_eq!(
+                stream_buffer::stream_buffer_decode(
+                    &mut memlimit,
+                    LZMA_CONCATENATED,
+                    ptr::null(),
+                    input.as_ptr(),
+                    &mut expected_in_pos,
+                    input.len(),
+                    expected.as_mut_ptr(),
+                    &mut expected_out_pos,
+                    expected.len(),
+                ),
+                LZMA_OK
+            );
+        }
+        expected.truncate(expected_out_pos);
+
+        unsafe {
+            let mt = lzma_mt {
+                flags: LZMA_TELL_UNSUPPORTED_CHECK | LZMA_CONCATENATED,
+                threads: 1,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 0,
+                memlimit_stop: u64::MAX,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+
+            let first_chunk = input.len().min(8192);
+            strm.next_in = input.as_ptr();
+            strm.avail_in = first_chunk;
+            strm.next_out = ptr::null_mut();
+            strm.avail_out = 0;
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_OK);
+
+            let mut offset = first_chunk;
+            let mut decoded = Vec::new();
+            let mut outbuf = [0u8; 8192];
+            loop {
+                if strm.avail_in == 0 && offset < input.len() {
+                    let take = (input.len() - offset).min(8192);
+                    strm.next_in = input.as_ptr().add(offset);
+                    strm.avail_in = take;
+                    offset += take;
+                }
+
+                strm.next_out = outbuf.as_mut_ptr();
+                strm.avail_out = outbuf.len();
+                let action = if offset == input.len() {
+                    LZMA_FINISH
+                } else {
+                    LZMA_RUN
+                };
+                let ret = lzma_code_impl(&mut strm, action);
+                let written = outbuf.len() - strm.avail_out;
+                decoded.extend_from_slice(&outbuf[..written]);
+
+                if ret == LZMA_STREAM_END {
+                    break;
+                }
+
+                assert_eq!(ret, LZMA_OK);
+            }
+
+            assert_eq!(decoded, expected);
             lzma_end_impl(&mut strm);
         }
     }

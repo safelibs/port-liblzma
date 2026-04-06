@@ -12,7 +12,7 @@ LIBLZMA_PUBLIC_VERSION := $(shell awk '/#define LZMA_VERSION_MAJOR/{major=$$3} /
 
 override_dh_auto_build:
 	mkdir -p "$(CARGO_HOME)"
-	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --release
+	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --locked --release
 	LIBLZMA_SKIP_CARGO_BUILD=1 "$(CURDIR)/scripts/relink-release-shared.sh"
 	sed \
 		-e 's|@prefix@|/usr|g' \
@@ -27,7 +27,7 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	mkdir -p "$(CARGO_HOME)"
-	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --release
+	cargo build --manifest-path "$(CURDIR)/Cargo.toml" --offline --locked --release
 	LIBLZMA_SKIP_CARGO_BUILD=1 "$(CURDIR)/scripts/relink-release-shared.sh"
 	sed \
 		-e 's|@prefix@|/usr|g' \

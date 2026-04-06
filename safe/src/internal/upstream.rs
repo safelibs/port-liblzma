@@ -1475,10 +1475,16 @@ unsafe fn stream_decoder_code(
     }
 
     if consumed_input < input_slice.len() {
-        coder.input.extend_from_slice(&input_slice[consumed_input..]);
+        coder
+            .input
+            .extend_from_slice(&input_slice[consumed_input..]);
         consumed_input = input_slice.len();
     }
     *in_pos = consumed_input;
+
+    if output.is_null() && out_size == 0 && action != crate::internal::common::LZMA_FINISH {
+        return LZMA_OK;
+    }
 
     let concatenated = (coder.flags & LZMA_CONCATENATED) != 0;
     if coder.memusage == LZMA_MEMUSAGE_BASE
@@ -1513,6 +1519,13 @@ unsafe fn stream_decoder_code(
             coder.output = decoded;
             coder.output_pos = 0;
             coder.decoded = true;
+            if output.is_null() && out_size == 0 {
+                return if coder.output.is_empty() {
+                    LZMA_STREAM_END
+                } else {
+                    LZMA_BUF_ERROR
+                };
+            }
             copy_output(
                 &coder.output,
                 &mut coder.output_pos,
@@ -2210,7 +2223,11 @@ mod tests {
         unsafe {
             let mut strm = LZMA_STREAM_INIT;
             assert_eq!(
-                stream_decoder(&mut strm, u64::MAX, LZMA_TELL_ANY_CHECK | LZMA_TELL_NO_CHECK),
+                stream_decoder(
+                    &mut strm,
+                    u64::MAX,
+                    LZMA_TELL_ANY_CHECK | LZMA_TELL_NO_CHECK
+                ),
                 LZMA_OK
             );
 
@@ -2303,6 +2320,98 @@ mod tests {
             assert_eq!(lzma_code_impl(&mut strm, LZMA_FINISH), LZMA_STREAM_END);
             assert_eq!(strm.total_out, 13);
             lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn stream_decoder_handles_xz_header_probe_without_output_buffer() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-1-delta-lzma2.tiff.xz"
+        ));
+        let (_, expected) =
+            decode_xz_stream_once(input, true, false).expect("decode reference xz stream");
+
+        unsafe {
+            let mut strm = LZMA_STREAM_INIT;
+            assert_eq!(
+                stream_decoder(
+                    &mut strm,
+                    u64::MAX,
+                    LZMA_TELL_UNSUPPORTED_CHECK | LZMA_CONCATENATED
+                ),
+                LZMA_OK
+            );
+
+            let first_chunk = input.len().min(8192);
+            strm.next_in = input.as_ptr();
+            strm.avail_in = first_chunk;
+            strm.next_out = ptr::null_mut();
+            strm.avail_out = 0;
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_OK);
+
+            let mut offset = first_chunk;
+            let mut decoded = Vec::new();
+            let mut outbuf = [0u8; 8192];
+            loop {
+                if strm.avail_in == 0 && offset < input.len() {
+                    let take = (input.len() - offset).min(8192);
+                    strm.next_in = input.as_ptr().add(offset);
+                    strm.avail_in = take;
+                    offset += take;
+                }
+
+                strm.next_out = outbuf.as_mut_ptr();
+                strm.avail_out = outbuf.len();
+                let action = if offset == input.len() {
+                    LZMA_FINISH
+                } else {
+                    LZMA_RUN
+                };
+                let ret = lzma_code_impl(&mut strm, action);
+                let written = outbuf.len() - strm.avail_out;
+                decoded.extend_from_slice(&outbuf[..written]);
+
+                if ret == LZMA_STREAM_END {
+                    break;
+                }
+
+                assert_eq!(ret, LZMA_OK);
+            }
+
+            assert_eq!(decoded, expected);
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn stream_buffer_decode_accepts_empty_bcj_block_without_output_space() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-1-empty-bcj-lzma2.xz"
+        ));
+
+        unsafe {
+            let mut memlimit = 1 << 20;
+            let mut in_pos = 0usize;
+            let mut out_pos = 0usize;
+            let mut out = [0u8; 1];
+            assert_eq!(
+                crate::internal::container::stream_buffer::stream_buffer_decode(
+                    &mut memlimit,
+                    0,
+                    ptr::null(),
+                    input.as_ptr(),
+                    &mut in_pos,
+                    input.len(),
+                    out.as_mut_ptr(),
+                    &mut out_pos,
+                    0,
+                ),
+                LZMA_OK
+            );
+            assert_eq!(in_pos, input.len());
+            assert_eq!(out_pos, 0);
         }
     }
 

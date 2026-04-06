@@ -38,6 +38,8 @@ fn lock<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
 #[derive(Copy, Clone)]
 struct AllocatorPtr(*const lzma_allocator);
 
+// Worker threads only borrow the allocator vtable while the owning stream is
+// alive; they never mutate the pointed-to allocator object.
 unsafe impl Send for AllocatorPtr {}
 
 struct OwnedFilters {
@@ -68,6 +70,8 @@ impl Drop for OwnedFilters {
     }
 }
 
+// Filter arrays are deep-copied before they cross the worker boundary, so each
+// worker owns and frees only its private copy.
 unsafe impl Send for OwnedFilters {}
 
 enum ResolvedFilters {
@@ -952,10 +956,9 @@ impl StreamEncoderMt {
         let mut out_total = shared.progress_out;
 
         for worker in &self.workers {
-            in_total = in_total
-                .saturating_add(worker.shared.progress_in.load(Ordering::Relaxed));
-            out_total = out_total
-                .saturating_add(worker.shared.progress_out.load(Ordering::Relaxed));
+            in_total = in_total.saturating_add(worker.shared.progress_in.load(Ordering::Relaxed));
+            out_total =
+                out_total.saturating_add(worker.shared.progress_out.load(Ordering::Relaxed));
         }
         drop(shared);
 

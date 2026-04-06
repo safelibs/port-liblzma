@@ -54,7 +54,7 @@ build_dir="$safe_dir/target/extra-c-tests"
 
 mkdir -p "$build_dir"
 
-cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
+cargo build --manifest-path "$safe_dir/Cargo.toml" --offline --locked --release >/dev/null
 "$script_dir/relink-release-shared.sh" >/dev/null
 
 if compgen -G "$repo_root/build/tests/*.o" >/dev/null; then
