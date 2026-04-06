@@ -11,6 +11,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 libc = "0.2"
+lzma-rust2 = { path = "vendor/lzma-rust2", default-features = false, features = ["std", "encoder", "lzip", "xz"] }
 
 [profile.dev]
 panic = "abort"

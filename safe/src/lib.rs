@@ -11,7 +11,12 @@ mod internal {
     pub(crate) mod filter;
     pub(crate) mod hardware;
     pub(crate) mod index;
+    pub(crate) mod lz;
+    pub(crate) mod lzma;
     pub(crate) mod preset;
+    pub(crate) mod rangecoder;
+    pub(crate) mod delta;
+    pub(crate) mod simple;
     pub(crate) mod stream_flags;
     pub(crate) mod stream_state;
     pub(crate) mod upstream;
