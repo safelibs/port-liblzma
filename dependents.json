@@ -2,9 +2,9 @@
   "schema_version": 1,
   "library": "liblzma",
   "distribution": "Ubuntu 24.04 LTS (noble)",
-  "collection_date_local": "2026-04-05",
-  "generated_at_utc": "2026-04-05T18:30:33Z",
-  "metadata_source": "local apt-cache binary and source package metadata, installed man pages, installed package file lists, installed headers, and installed binary/library strings from an Ubuntu 24.04 system configured against the Ubuntu 24.04 repositories",
+  "collection_date_local": "2026-04-06",
+  "generated_at_utc": "2026-04-06T10:20:44Z",
+  "metadata_source": "local apt-cache binary and source package metadata, installed man pages, installed package file lists, installed headers, installed binary/library strings, and local runtime smoke checks from an Ubuntu 24.04 system configured against the Ubuntu 24.04 repositories",
   "selection_scope": {
     "goal": "Curate a diverse, non-exhaustive set of Ubuntu 24.04 repository packages whose build or runtime behavior depends on liblzma.",
     "selection_policy": [
@@ -224,6 +224,30 @@
         "Ubuntu source metadata: libarchive Build-Depends on liblzma-dev.",
         "The Ubuntu package description explicitly says the library supports xz and lzma filters using liblzma.",
         "The installed archive.h header declares archive_read_support_filter_xz(), archive_read_support_filter_lzma(), archive_write_add_filter_xz(), and archive_write_add_filter_lzma()."
+      ]
+    },
+    {
+      "binary_package": "libarchive-tools",
+      "source_package": "libarchive",
+      "category": "archive CLI tool",
+      "dependency_kind": [
+        "build",
+        "runtime"
+      ],
+      "runtime_dependency_type": "indirect",
+      "runtime_dependency_path": [
+        "libarchive-tools",
+        "libarchive13t64",
+        "liblzma5"
+      ],
+      "direct_build_dependency": "liblzma-dev",
+      "runtime_functionality": "Provides bsdtar and bsdcat so users can create, list, extract, and decompress xz/lzma-backed archive streams through libarchive.",
+      "runtime_evidence_level": "explicit",
+      "evidence": [
+        "Ubuntu package metadata: libarchive-tools depends on libarchive13t64, and libarchive13t64 depends on liblzma5.",
+        "Ubuntu source metadata: libarchive Build-Depends on liblzma-dev.",
+        "A local runtime check with bsdtar successfully created, listed, and extracted a tar.xz archive.",
+        "A local runtime check with bsdcat successfully decompressed an xz payload."
       ]
     },
     {
