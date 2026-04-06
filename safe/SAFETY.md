@@ -31,6 +31,7 @@ The shipped Rust dependency graph is intentionally small: `safe-liblzma`, vendor
 | `safe/src/lib.rs` | `global_asm!` symver include | Linux ABI compatibility requires symbol-version alias shims that cannot be expressed in safe Rust. |
 | `safe/src/ffi/types.rs` | `unsafe extern "C" fn` pointer types in public structs | These are ABI declarations for allocator callbacks, not executable unsafe logic. |
 | `safe/src/ffi/stubs.rs` | Exported `pub unsafe extern "C" fn lzma_*` wrappers | Direct public C ABI entrypoints must accept raw pointers and forward them to the validated Rust implementation. |
+| `safe/fuzz/src/lib.rs` | Fuzzer ABI pointer translation and calls into the public `lzma_*` C entrypoints | The decode harness keeps the upstream OSS-Fuzz shape, so it must adapt `LLVMFuzzerTestOneInput(data, size)` to a Rust slice and drive the decoder through the same public ABI that external C callers use. |
 | `safe/src/internal/block/buffer.rs` | Raw block/header/buffer pointer handling | The block buffer APIs operate on caller-owned `lzma_block` state and byte buffers. |
 | `safe/src/internal/block/coder.rs` | Stream callback trampolines and coder state pointers | The stream-state ABI stores opaque coder pointers and invokes C-shaped callbacks. |
 | `safe/src/internal/block/header.rs` | Byte-wise header reads/writes and `lzma_block*` access | Block headers are C layout data structures encoded directly into caller buffers. |
@@ -86,5 +87,6 @@ The benchmark gate intentionally reports these as visible warnings instead of a 
 ## Verification Hooks
 
 - `safe/scripts/release-verify.sh` traces the package build, rejects forbidden implementation inputs, checks tracked/textual source provenance for the files the build actually consumes, compares installed headers and symbol maps to the authoritative upstream originals, and confirms the packaged library matches the freshly built Rust artifact.
+- `safe/scripts/run-rust-unit-tests.sh` and `safe/scripts/release-verify.sh` both exercise `safe/fuzz/` with locked offline Cargo resolution so the decode-focused harness stays in the final gate instead of drifting as a standalone workspace.
 - `safe/fuzz/` contains a decode-focused harness with the same 300 MiB memory limit posture as the upstream OSS-Fuzz target.
 - `safe/scripts/benchmark.sh` compares the Rust library against `build/src/liblzma/.libs/liblzma.so.5.4.5` on representative encode and decode workloads so regressions are visible before release.

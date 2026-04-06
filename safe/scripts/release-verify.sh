@@ -21,6 +21,7 @@ log_step() {
 
 clean_generated() {
   cargo clean --manifest-path "$safe_dir/Cargo.toml" >/dev/null 2>&1 || true
+  cargo clean --manifest-path "$safe_dir/fuzz/Cargo.toml" >/dev/null 2>&1 || true
 
   rm -rf \
     "$safe_dir/debian/.debhelper" \
@@ -106,6 +107,9 @@ log_step "Checking locked offline Cargo resolution"
 cargo metadata --manifest-path "$safe_dir/Cargo.toml" --offline --locked --format-version=1 \
   >"$tmpdir/cargo-metadata.json"
 cargo build --manifest-path "$safe_dir/Cargo.toml" --offline --locked --release >/dev/null
+cargo metadata --manifest-path "$safe_dir/fuzz/Cargo.toml" --offline --locked --format-version=1 \
+  >"$tmpdir/fuzz-cargo-metadata.json"
+cargo test --manifest-path "$safe_dir/fuzz/Cargo.toml" --offline --locked >/dev/null
 LIBLZMA_SKIP_CARGO_BUILD=1 "$script_dir/relink-release-shared.sh" >/dev/null
 
 log_step "Tracing a clean Debian package build"
