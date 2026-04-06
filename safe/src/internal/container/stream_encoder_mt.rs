@@ -36,11 +36,17 @@ fn lock<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
 }
 
 #[derive(Copy, Clone)]
-struct AllocatorPtr(*const lzma_allocator);
+struct AllocatorHandle(usize);
 
-// Worker threads only borrow the allocator vtable while the owning stream is
-// alive; they never mutate the pointed-to allocator object.
-unsafe impl Send for AllocatorPtr {}
+impl AllocatorHandle {
+    fn new(ptr: *const lzma_allocator) -> Self {
+        Self(ptr as usize)
+    }
+
+    fn as_ptr(self) -> *const lzma_allocator {
+        self.0 as *const lzma_allocator
+    }
+}
 
 struct OwnedFilters {
     filters: FilterArray,
@@ -70,9 +76,28 @@ impl Drop for OwnedFilters {
     }
 }
 
-// Filter arrays are deep-copied before they cross the worker boundary, so each
-// worker owns and frees only its private copy.
-unsafe impl Send for OwnedFilters {}
+struct OwnedFiltersHandle(usize);
+
+impl OwnedFiltersHandle {
+    fn new(filters: OwnedFilters) -> Self {
+        Self(Box::into_raw(Box::new(filters)) as usize)
+    }
+
+    unsafe fn into_owned(mut self) -> OwnedFilters {
+        let ptr = mem::take(&mut self.0);
+        *Box::from_raw(ptr as *mut OwnedFilters)
+    }
+}
+
+impl Drop for OwnedFiltersHandle {
+    fn drop(&mut self) {
+        if self.0 != 0 {
+            unsafe {
+                drop(Box::from_raw(self.0 as *mut OwnedFilters));
+            }
+        }
+    }
+}
 
 enum ResolvedFilters {
     Borrowed(*const lzma_filter),
@@ -112,7 +137,7 @@ struct EncoderWorkerState {
     input: Vec<u8>,
     in_size: usize,
     outbuf: Option<Arc<OutBuf>>,
-    filters: Option<OwnedFilters>,
+    filters: Option<OwnedFiltersHandle>,
     progress_in: u64,
     progress_out: u64,
 }
@@ -341,7 +366,7 @@ fn wait_on_encoder(
 
 fn encoder_worker_loop(
     worker_id: usize,
-    allocator: AllocatorPtr,
+    allocator: AllocatorHandle,
     block_size: usize,
     outbuf_alloc_size: usize,
     check: lzma_check,
@@ -368,7 +393,13 @@ fn encoder_worker_loop(
             }
 
             (
-                state.filters.take().expect("worker filters missing"),
+                unsafe {
+                    state
+                        .filters
+                        .take()
+                        .expect("worker filters missing")
+                        .into_owned()
+                },
                 state.outbuf.clone().expect("worker outbuf missing"),
                 state.command,
             )
@@ -386,7 +417,7 @@ fn encoder_worker_loop(
         let mut consumed = 0usize;
 
         let mut inner = crate::ffi::types::LZMA_STREAM_INIT;
-        inner.allocator = allocator.0;
+        inner.allocator = allocator.as_ptr();
         if job_ret == LZMA_OK {
             job_ret = unsafe { block::block_encoder(&mut inner, &mut block_opts) };
         }
@@ -655,7 +686,7 @@ impl StreamEncoderMt {
                 .spawn({
                     let shared = shared.clone();
                     let worker = worker_shared.clone();
-                    let allocator = AllocatorPtr(allocator);
+                    let allocator = AllocatorHandle::new(allocator);
                     move || {
                         encoder_worker_loop(
                             worker_id,
@@ -744,7 +775,7 @@ impl StreamEncoderMt {
             state.input.resize(self.block_size, 0);
         }
         state.outbuf = Some(outbuf);
-        state.filters = Some(filters);
+        state.filters = Some(OwnedFiltersHandle::new(filters));
         state.command = EncoderCommand::Run;
         worker.shared.cond.notify_all();
         self.current_worker = Some(worker_id);

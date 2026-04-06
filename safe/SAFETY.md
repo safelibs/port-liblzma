@@ -19,7 +19,7 @@ The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detect
 - Every exported `lzma_*` entrypoint treats all caller pointers as untrusted until null, size, and state checks have run.
 - Internal callbacks only mutate caller-owned buffers through the `(ptr, pos, size)` triplets that the C ABI already exposes.
 - Heap objects allocated through `lzma_allocator` are created and freed through the same allocator family.
-- Multithreaded encoder and decoder workers only receive deep-copied filter arrays or immutable allocator vtable pointers; they do not share mutable Rust references across threads.
+- Multithreaded encoder and decoder workers only receive deep-copied filter arrays or opaque allocator handles; they do not share mutable Rust references across threads.
 - The package build is expected to consume tracked files from `safe/` plus the non-code upstream documentation files `original/AUTHORS`, `original/NEWS`, and `original/THANKS`. `safe/scripts/release-verify.sh` traces this explicitly.
 
 ## Remaining Unsafe Inventory
@@ -41,14 +41,13 @@ The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detect
 | `safe/src/internal/container/outqueue.rs` | Raw output-buffer copy helper | The queue drains into caller-provided `(out, out_pos, out_size)` buffers. |
 | `safe/src/internal/container/stream.rs` | Stream entrypoints and output copies | These are thin ABI shims over the stream coder core. |
 | `safe/src/internal/container/stream_buffer.rs` | Whole-buffer encode/decode entrypoints | The API shape is raw-pointer based by contract. |
-| `safe/src/internal/container/stream_encoder_mt.rs` | Stream-mt callbacks, worker handoff, `unsafe impl Send` | The threaded encoder must move deep-copied filter arrays and immutable allocator pointers into worker threads while preserving the C ABI lifetime rules. |
-| `safe/src/internal/container/stream_decoder_mt.rs` | Stream-mt callbacks, worker handoff, `unsafe impl Send` | Same justification as the threaded encoder, on the decoder side. |
+| `safe/src/internal/container/stream_encoder_mt.rs` | Stream-mt callbacks and pointer-based block/stream state access | The threaded encoder still exposes the upstream MT ABI and writes directly into caller-owned stream buffers. |
+| `safe/src/internal/container/stream_decoder_mt.rs` | Stream-mt callbacks and pointer-based block/stream state access | Same ABI constraint as the threaded encoder, on the decoder side. |
 | `safe/src/internal/delta/common.rs` | Raw delta-option pointer reads | Delta options arrive as `lzma_options_delta*` from C callers. |
 | `safe/src/internal/filter/common.rs` | Filter-array copy/free/validate helpers | Public filter chains are raw C arrays terminated by `LZMA_VLI_UNKNOWN`. |
 | `safe/src/internal/filter/flags.rs` | Filter flag encode/decode over raw buffers | The filter flag format is a byte-level public ABI. |
 | `safe/src/internal/filter/properties.rs` | Option-struct access and property bytes | Filter property blobs are defined by the C API and require direct layout control. |
 | `safe/src/internal/filter/string_conv.rs` | Filter option parsing/stringification through raw option payloads | String conversion allocates and fills ABI-defined option records through raw pointers. |
-| `safe/src/internal/hardware.rs` | OS FFI calls for memory discovery | `sysconf`, `sysctlbyname`, and `GlobalMemoryStatusEx` are raw foreign interfaces. |
 | `safe/src/internal/index/core.rs` | Raw backing storage and ABI-compatible index layout translation | The index APIs expose opaque C pointers with upstream-compatible layout requirements. |
 | `safe/src/internal/index/decode.rs` | Index decoder callbacks and raw index allocation | The decoder owns opaque index state behind ABI pointers. |
 | `safe/src/internal/index/encode.rs` | Index encoder callbacks | The encoder is registered through the stream-state ABI callback table. |
@@ -66,17 +65,18 @@ The CRC helpers do not currently require `unsafe` intrinsics. CPU feature detect
 ## What This Audit Removed
 
 - Cargo-driven release and package builds now run `--offline --locked`.
-- The multithreaded `unsafe impl Send` sites are now documented inline where they occur.
+- The multithreaded workers now receive owned filter handles and opaque allocator addresses, removing the previous marker-trait exemption.
 - Stale Rust re-exports that were generating warning noise were removed so the hardening gate is easier to interpret.
 
 ## Performance Triage
 
-`safe/scripts/benchmark.sh` was run on 2026-04-05 against `build/src/liblzma/.libs/liblzma.so.5.4.5`.
+`safe/scripts/benchmark.sh` was rerun on 2026-04-05 and 2026-04-06 against
+`build/src/liblzma/.libs/liblzma.so.5.4.5`.
 
-- `encode-text`: `0.228x` reference throughput
-- `encode-random`: `1.225x` reference throughput
-- `decode-text`: `0.151x` reference throughput
-- `decode-random`: `0.104x` reference throughput
+- `encode-text`: about `0.23x` to `0.27x` reference throughput
+- `encode-random`: about `1.08x` to `1.23x` reference throughput
+- `decode-text`: about `0.15x` reference throughput
+- `decode-random`: about `0.10x` reference throughput
 
 The benchmark gate intentionally reports these as visible warnings instead of a release-blocking failure. The regression is concentrated in codec hot paths, not in the package, ABI, or symbol-compatibility layers audited in this phase, and compatibility plus supply-chain hardening remained the higher-priority ship criteria for this port.
 

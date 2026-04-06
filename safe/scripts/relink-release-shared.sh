@@ -15,6 +15,7 @@ default_aliases="$compat_dir/linux_symver_defaults.S"
 default_aliases_obj="$compat_dir/linux_symver_defaults.o"
 compat_aliases="$compat_dir/linux_symver_compat.S"
 compat_aliases_obj="$compat_dir/linux_symver_compat.o"
+compat_alias_args=()
 
 split_flags() {
   local value="$1"
@@ -139,7 +140,9 @@ EOF
 
 cc "${cppflags[@]}" "${cflags[@]}" -fPIC -c "$default_aliases" -o "$default_aliases_obj"
 
-cat > "$compat_aliases" <<'EOF'
+if ! (nm -g --defined-only "$static_lib" 2>/dev/null || true) \
+  | grep -q '__symver_lzma_block_uncomp_encode_XZ_5_2_2'; then
+  cat > "$compat_aliases" <<'EOF'
     .text
 
     .macro version_compat alias, exported, target
@@ -163,14 +166,16 @@ cat > "$compat_aliases" <<'EOF'
     .section .note.GNU-stack,"",@progbits
 EOF
 
-cc "${cppflags[@]}" "${cflags[@]}" -fPIC -c "$compat_aliases" -o "$compat_aliases_obj"
+  cc "${cppflags[@]}" "${cflags[@]}" -fPIC -c "$compat_aliases" -o "$compat_aliases_obj"
+  compat_alias_args=("$compat_aliases_obj")
+fi
 
 cc -shared \
   "${cflags[@]}" \
   "${ldflags[@]}" \
   -o "$shared_lib" \
   "$default_aliases_obj" \
-  "$compat_aliases_obj" \
+  "${compat_alias_args[@]}" \
   -Wl,--whole-archive "$compat_archive" -Wl,--no-whole-archive \
   -Wl,--version-script="$compat_map" \
   -Wl,-soname,liblzma.so.5 \

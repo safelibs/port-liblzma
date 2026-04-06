@@ -40,11 +40,17 @@ fn lock<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
 }
 
 #[derive(Copy, Clone)]
-struct AllocatorPtr(*const lzma_allocator);
+struct AllocatorHandle(usize);
 
-// Worker threads only borrow the allocator vtable while the owning stream is
-// alive; they never mutate the pointed-to allocator object.
-unsafe impl Send for AllocatorPtr {}
+impl AllocatorHandle {
+    fn new(ptr: *const lzma_allocator) -> Self {
+        Self(ptr as usize)
+    }
+
+    fn as_ptr(self) -> *const lzma_allocator {
+        self.0 as *const lzma_allocator
+    }
+}
 
 struct OwnedFilters {
     filters: FilterArray,
@@ -66,9 +72,28 @@ impl Drop for OwnedFilters {
     }
 }
 
-// Filter arrays are deep-copied before they cross the worker boundary, so each
-// worker owns and frees only its private copy.
-unsafe impl Send for OwnedFilters {}
+struct OwnedFiltersHandle(usize);
+
+impl OwnedFiltersHandle {
+    fn new(filters: OwnedFilters) -> Self {
+        Self(Box::into_raw(Box::new(filters)) as usize)
+    }
+
+    unsafe fn take_owned(&mut self) -> OwnedFilters {
+        let ptr = mem::take(&mut self.0);
+        *Box::from_raw(ptr as *mut OwnedFilters)
+    }
+}
+
+impl Drop for OwnedFiltersHandle {
+    fn drop(&mut self) {
+        if self.0 != 0 {
+            unsafe {
+                drop(Box::from_raw(self.0 as *mut OwnedFilters));
+            }
+        }
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum DecoderSequence {
@@ -106,7 +131,7 @@ struct DecoderBlockJob {
     compressed_size: lzma_vli,
     uncompressed_size: lzma_vli,
     ignore_check: bool,
-    filters: OwnedFilters,
+    filters: OwnedFiltersHandle,
     mem_filters: u64,
 }
 
@@ -411,7 +436,7 @@ fn wait_on_decoder(
 
 fn decoder_worker_loop(
     worker_id: usize,
-    allocator: AllocatorPtr,
+    allocator: AllocatorHandle,
     shared: Arc<DecoderShared>,
     worker: Arc<DecoderWorkerShared>,
 ) {
@@ -438,6 +463,8 @@ fn decoder_worker_loop(
             )
         };
 
+        let mut filters = unsafe { job.filters.take_owned() };
+
         let mut block_opts: lzma_block = unsafe { mem::zeroed() };
         block_opts.version = 1;
         block_opts.header_size = job.header_size;
@@ -445,9 +472,9 @@ fn decoder_worker_loop(
         block_opts.compressed_size = job.compressed_size;
         block_opts.uncompressed_size = job.uncompressed_size;
         block_opts.ignore_check = to_lzma_bool(job.ignore_check);
-        block_opts.filters = job.filters.as_mut_ptr();
+        block_opts.filters = filters.as_mut_ptr();
 
-        let chain = unsafe { crate::internal::lzma::parse_filters(job.filters.filters.as_ptr()) };
+        let chain = unsafe { crate::internal::lzma::parse_filters(filters.filters.as_ptr()) };
         let (mut ret, in_pos, out_pos) = match chain {
             Ok(chain) => {
                 let mut checked_input = 0usize;
@@ -525,7 +552,7 @@ fn decoder_worker_loop(
                         unsafe {
                             block::block_buffer_decode(
                                 &mut block_opts,
-                                allocator.0,
+                                allocator.as_ptr(),
                                 input_copy.as_ptr(),
                                 &mut full_in_pos,
                                 input_copy.len(),
@@ -651,7 +678,7 @@ impl StreamDecoderMt {
                 .spawn({
                     let shared = shared.clone();
                     let worker = worker_shared.clone();
-                    let allocator = AllocatorPtr(allocator);
+                    let allocator = AllocatorHandle::new(allocator);
                     move || decoder_worker_loop(worker_id, allocator, shared, worker)
                 }) {
                 Ok(handle) => handle,
@@ -774,7 +801,7 @@ impl StreamDecoderMt {
             compressed_size: self.block_options.compressed_size,
             uncompressed_size: self.block_options.uncompressed_size,
             ignore_check: self.ignore_check,
-            filters: OwnedFilters::copy_from(self.filters.as_ptr())?,
+            filters: OwnedFiltersHandle::new(OwnedFilters::copy_from(self.filters.as_ptr())?),
             mem_filters: self.mem_next_filters,
         });
         state.command = DecoderCommand::Run;
