@@ -929,13 +929,13 @@ impl StreamEncoderMt {
         let shared = lock(&self.shared.state);
         let mut in_total = shared.progress_in;
         let mut out_total = shared.progress_out;
-        drop(shared);
 
         for worker in &self.workers {
             let state = lock(&worker.shared.state);
             in_total = in_total.saturating_add(state.progress_in);
             out_total = out_total.saturating_add(state.progress_out);
         }
+        drop(shared);
 
         *progress_in = in_total;
         *progress_out = out_total;

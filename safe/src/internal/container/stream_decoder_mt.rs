@@ -271,7 +271,7 @@ fn threaded_input_possible(coder: &StreamDecoderMt, shared: &DecoderSharedState)
 }
 
 fn wait_on_decoder(
-    coder: &StreamDecoderMt,
+    coder: &mut StreamDecoderMt,
     waiting_allowed: bool,
     wait_deadline: &mut Option<Instant>,
     mut input_possible: Option<&mut bool>,
@@ -314,6 +314,8 @@ fn wait_on_decoder(
                 abort_workers(coder);
                 return ret;
             }
+
+            coder.pending_error = LZMA_PROG_ERROR;
         }
 
         if let Some(flag) = input_possible.as_deref_mut() {
@@ -759,13 +761,13 @@ impl StreamDecoderMt {
         let shared = lock(&self.shared.state);
         let mut in_total = shared.progress_in;
         let mut out_total = shared.progress_out;
-        drop(shared);
 
         for worker in &self.workers {
             let state = lock(&worker.shared.state);
             in_total = in_total.saturating_add(state.progress_in as u64);
             out_total = out_total.saturating_add(state.progress_out as u64);
         }
+        drop(shared);
 
         if let Some(direct) = &self.direct {
             in_total = in_total.saturating_add(direct.inner.total_in);
@@ -882,6 +884,10 @@ impl StreamDecoderMt {
                         if wait_ret != LZMA_OK {
                             return wait_ret;
                         }
+                        if self.pending_error != LZMA_OK {
+                            self.sequence = DecoderSequence::Error;
+                            continue;
+                        }
                         if self.fail_fast && action == LZMA_FINISH {
                             abort_workers(self);
                             return LZMA_DATA_ERROR;
@@ -987,6 +993,10 @@ impl StreamDecoderMt {
                     if ret != LZMA_OK {
                         return ret;
                     }
+                    if self.pending_error != LZMA_OK {
+                        self.sequence = DecoderSequence::Error;
+                        continue;
+                    }
                     if !can_start {
                         if *out_pos == out_size {
                             self.out_was_filled = true;
@@ -1016,8 +1026,8 @@ impl StreamDecoderMt {
                     }
 
                     let worker_id = self.current_worker.expect("decoder worker");
-                    let worker = &self.workers[worker_id];
                     {
+                        let worker = &self.workers[worker_id];
                         let mut state = lock(&worker.shared.state);
                         let copy_size = (state.in_size - state.in_filled).min(in_size - *in_pos);
                         if copy_size != 0 {
@@ -1047,8 +1057,12 @@ impl StreamDecoderMt {
                     if ret != LZMA_OK {
                         return ret;
                     }
+                    if self.pending_error != LZMA_OK {
+                        self.sequence = DecoderSequence::Error;
+                        continue;
+                    }
 
-                    let state = lock(&worker.shared.state);
+                    let state = lock(&self.workers[worker_id].shared.state);
                     if state.in_filled < state.in_size {
                         if *out_pos == out_size {
                             self.out_was_filled = true;
@@ -1583,6 +1597,66 @@ mod tests {
                 }
             }
             assert_eq!(poisoned_workers, 1);
+
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn wait_on_decoder_sets_pending_error_after_worker_error() {
+        unsafe {
+            let mt = lzma_mt {
+                flags: 0,
+                threads: 2,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+
+            let decoder = &mut *decoder_from_stream(&strm).cast_mut();
+            {
+                let mut shared = lock(&decoder.shared.state);
+                shared.thread_error = LZMA_DATA_ERROR;
+            }
+
+            let mut can_start = false;
+            let mut wait_deadline = None;
+            let mut out = [0u8; 1];
+            let mut out_pos = 0usize;
+            assert_eq!(
+                wait_on_decoder(
+                    decoder,
+                    false,
+                    &mut wait_deadline,
+                    Some(&mut can_start),
+                    out.as_mut_ptr(),
+                    &mut out_pos,
+                    out.len(),
+                ),
+                LZMA_OK
+            );
+            assert!(can_start, "threading conditions remain favorable");
+            assert_eq!(decoder.pending_error, LZMA_PROG_ERROR);
 
             lzma_end_impl(&mut strm);
         }
