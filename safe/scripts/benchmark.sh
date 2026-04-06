@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 safe_dir=$(cd "$script_dir/.." && pwd)
 repo_root=$(cd "$safe_dir/.." && pwd)
-ref_lib="$repo_root/build/src/liblzma/.libs/liblzma.so.5.4.5"
+ref_lib="build/src/liblzma/.libs/liblzma.so.5.4.5"
 
 iterations=${LIBLZMA_BENCH_ITERATIONS:-5}
 size_mib=${LIBLZMA_BENCH_SIZE_MIB:-8}
@@ -26,9 +26,13 @@ while (($#)); do
       warn_ratio="${2:?missing value for --warn-ratio}"
       shift 2
       ;;
+    --reference)
+      ref_lib="${2:?missing value for --reference}"
+      shift 2
+      ;;
     --help|-h)
       cat <<EOF
-usage: $(basename "$0") [--iterations N] [--size-mib N] [--warn-ratio R]
+usage: $(basename "$0") [--iterations N] [--size-mib N] [--warn-ratio R] [--reference PATH]
 
 Benchmarks the safe release library against the reference
 $ref_lib on representative encode and decode workloads.
@@ -41,6 +45,10 @@ EOF
       ;;
   esac
 done
+
+if [[ "$ref_lib" != /* ]]; then
+  ref_lib="$repo_root/$ref_lib"
+fi
 
 command -v cc >/dev/null 2>&1 || {
   printf 'missing required tool: cc\n' >&2

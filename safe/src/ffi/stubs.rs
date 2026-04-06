@@ -1,5 +1,6 @@
 // Generated from the upstream public prototypes in lzma.h and the Linux symbol map.
 #![allow(non_snake_case)]
+#![allow(clippy::missing_safety_doc)]
 
 use core::ffi::{c_char, c_int};
 

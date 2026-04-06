@@ -35,6 +35,12 @@ while [[ $# -gt 0 ]]; do
         mode="run"
       fi
       ;;
+    --all)
+      if [[ $mode_explicit -eq 0 ]]; then
+        mode="run"
+      fi
+      shift
+      ;;
     *)
       printf 'unknown mode: %s\n' "$1" >&2
       exit 1

@@ -16,6 +16,9 @@ while [[ $# -gt 0 ]]; do
     --force)
       shift
       ;;
+    --all)
+      shift
+      ;;
     --tests)
       shift
       tests=()

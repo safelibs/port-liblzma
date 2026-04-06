@@ -1,4 +1,13 @@
 #![allow(non_camel_case_types)]
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::manual_clamp)]
+#![allow(clippy::manual_div_ceil)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::manual_range_contains)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::ptr_eq)]
+#![allow(clippy::too_many_arguments)]
 
 pub mod ffi;
 mod internal {
