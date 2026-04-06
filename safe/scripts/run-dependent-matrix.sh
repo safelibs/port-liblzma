@@ -15,7 +15,7 @@ safe_package_dir="$default_safe_package_dir"
 
 usage() {
   cat <<'EOF'
-usage: safe/scripts/run-dependent-matrix.sh [--implementation <original|safe>] [--safe-package-dir <dir>] [--allow-failures]
+usage: safe/scripts/run-dependent-matrix.sh [--implementation <original|safe>] [--safe-package-dir <dir>] [--report <path>] [--allow-failures]
 
 Runs ./test-original.sh --only <binary_package> once per dependent listed in
 dependents.json, captures deterministic per-package logs, and refreshes
@@ -23,6 +23,7 @@ safe/tests/generated/dependent-matrix.json with the ordered results.
 
 --implementation defaults to safe.
 --safe-package-dir defaults to safe/dist.
+--report defaults to safe/tests/generated/dependent-matrix.json.
 --allow-failures exits zero after the full sweep even if some packages fail.
 EOF
 }
@@ -35,6 +36,10 @@ while (($#)); do
       ;;
     --safe-package-dir)
       safe_package_dir="${2:?missing value for --safe-package-dir}"
+      shift 2
+      ;;
+    --report)
+      report_path="${2:?missing value for --report}"
       shift 2
       ;;
     --allow-failures)
@@ -65,6 +70,10 @@ esac
 
 if [[ "$safe_package_dir" != /* ]]; then
   safe_package_dir="$repo_root/$safe_package_dir"
+fi
+
+if [[ "$report_path" != /* ]]; then
+  report_path="$repo_root/$report_path"
 fi
 
 command -v python3 >/dev/null 2>&1 || {
@@ -122,9 +131,9 @@ for package in "${packages[@]}"; do
   rc=$?
   set -e
 
-  status="passed"
+  status="pass"
   if [[ "$rc" -ne 0 ]]; then
-    status="failed"
+    status="fail"
     have_failures=1
   fi
 

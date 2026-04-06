@@ -2,9 +2,6 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive-too
 #0 building with "default" instance using docker driver
 
 #1 [internal] load build definition from Dockerfile
-#1 DONE 0.0s
-
-#1 [internal] load build definition from Dockerfile
 #1 transferring dockerfile: 1.53kB done
 #1 DONE 0.1s
 
@@ -12,6 +9,7 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive-too
 #2 DONE 0.0s
 
 #3 [internal] load .dockerignore
+#3 transferring context:
 #3 transferring context: 2B done
 #3 DONE 0.1s
 
@@ -30,7 +28,7 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive-too
 
 #8 exporting to image
 #8 exporting layers done
-#8 writing image sha256:926d1e1acb2dde7fb104c5dc4e28d92af217385e8d1b0e3e4ce43d20ea07bf55 done
+#8 writing image sha256:e9aad97b6dc8f962de3aa9a4e4eae80a64f9de9b601f31abcddeda4e303d6c19 done
 #8 naming to docker.io/library/liblzma-dependent-test:ubuntu24.04-safe done
 #8 DONE 0.0s
 liblzma-dependent-test:ubuntu24.04-safe
