@@ -5,7 +5,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 export DEBIAN_FRONTEND=noninteractive
 
-READ_ONLY_ROOT=/work
+READ_ONLY_ROOT="${LIBLZMA_READ_ONLY_ROOT:-/work}"
 IMPLEMENTATION="${LIBLZMA_IMPLEMENTATION:-original}"
 SOURCE_ROOT=/tmp/liblzma-original
 BUILD_ROOT=/tmp/liblzma-build
@@ -13,12 +13,15 @@ TEST_ROOT=/tmp/liblzma-dependent-tests
 ONLY="${LIBLZMA_TEST_ONLY:-}"
 CURRENT_STEP=""
 MULTIARCH="$(gcc -print-multiarch)"
+MULTIARCH_LIBDIR="/usr/lib/${MULTIARCH}"
+TRACKED_ROOT="${READ_ONLY_ROOT}/safe/tests/dependents"
+INCLUDE_ROOT="${READ_ONLY_ROOT}/safe/include"
 ACTIVE_LIBLZMA=""
-APT_LIB="/usr/lib/${MULTIARCH}/libapt-pkg.so.6.0"
-LIBXML2_SO="/usr/lib/${MULTIARCH}/libxml2.so.2"
-LIBTIFF_SO="/usr/lib/${MULTIARCH}/libtiff.so.6"
-LIBARCHIVE_SO="/usr/lib/${MULTIARCH}/libarchive.so.13"
-BOOST_IOSTREAMS_SO="/usr/lib/${MULTIARCH}/libboost_iostreams.so.1.83.0"
+APT_LIB="${MULTIARCH_LIBDIR}/libapt-pkg.so.6.0"
+LIBXML2_SO="${MULTIARCH_LIBDIR}/libxml2.so.2"
+LIBTIFF_SO="${MULTIARCH_LIBDIR}/libtiff.so.6"
+LIBARCHIVE_SO="${MULTIARCH_LIBDIR}/libarchive.so.13"
+BOOST_IOSTREAMS_SO="${MULTIARCH_LIBDIR}/libboost_iostreams.so.1.83.0"
 DPKG_DEB_BIN="/usr/bin/dpkg-deb"
 APT_GET_BIN="/usr/bin/apt-get"
 APT_CACHE_BIN="/usr/bin/apt-cache"
@@ -34,6 +37,15 @@ MARIADB_BIN="$(command -v mariadb)"
 MARIADBD_BIN="$(command -v mariadbd)"
 MARIADB_INSTALL_DB_BIN="$(command -v mariadb-install-db)"
 MARIADB_PLUGIN_SO="/usr/lib/mysql/plugin/provider_lzma.so"
+PYTHON_LZMA_SMOKE="${TRACKED_ROOT}/python_lzma_smoke.py"
+LIBTIFF_SMOKE_SRC="${TRACKED_ROOT}/libtiff_smoke.c"
+GDB_SMOKE_SRC="${TRACKED_ROOT}/gdb_smoke.c"
+BOOST_IOSTREAMS_SMOKE_SRC="${TRACKED_ROOT}/boost_iostreams_smoke.cpp"
+LIBARCHIVE_TOOLS_SMOKE="${TRACKED_ROOT}/libarchive_tools_smoke.sh"
+DPKG_SMOKE_HELPER="${TRACKED_ROOT}/create_dpkg_smoke_package.sh"
+APT_SMOKE_HELPER="${TRACKED_ROOT}/create_apt_smoke_repo.sh"
+LIBXML2_SMOKE_DOC="${TRACKED_ROOT}/libxml2_document.xml"
+KMOD_SMOKE_SRC="${TRACKED_ROOT}/kmod_smoke_module.c"
 
 trap 'rc=$?; if [[ "$rc" -ne 0 && -n "$CURRENT_STEP" ]]; then printf "failed during: %s\n" "$CURRENT_STEP" >&2; fi; exit "$rc"' EXIT
 
@@ -44,6 +56,18 @@ log_step() {
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+export_probe_environment() {
+  export LIBLZMA_DEPENDENT_ACTIVE_LIBLZMA="$ACTIVE_LIBLZMA"
+  export LIBLZMA_DEPENDENT_INCLUDE_DIR="$INCLUDE_ROOT"
+  export LIBLZMA_DEPENDENT_MULTIARCH="$MULTIARCH"
+  export LIBLZMA_DEPENDENT_MULTIARCH_LIBDIR="$MULTIARCH_LIBDIR"
+  export LIBLZMA_DEPENDENT_REPO_ROOT="$READ_ONLY_ROOT"
+  export LIBLZMA_DEPENDENT_TEST_ROOT="$TEST_ROOT"
+  export LIBLZMA_DEPENDENT_TRACKED_ROOT="$TRACKED_ROOT"
+  export BSDCAT_BIN
+  export BSDTAR_BIN
 }
 
 require_nonempty_file() {
@@ -83,6 +107,12 @@ assert_exists() {
   local path="$1"
 
   [[ -e "$path" ]] || die "missing path: $path"
+}
+
+assert_tracked_file() {
+  local path="$1"
+
+  [[ -f "$path" ]] || die "missing tracked test asset: $path"
 }
 
 assert_links_to_active_liblzma() {
@@ -132,6 +162,7 @@ build_original_liblzma() {
 
   ACTIVE_LIBLZMA="$(readlink -f /usr/local/lib/liblzma.so.5)"
   [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to install local liblzma shared library"
+  export_probe_environment
   cd /
 }
 
@@ -148,40 +179,24 @@ select_safe_liblzma() {
 
   ACTIVE_LIBLZMA="$(readlink -f "/usr/lib/${MULTIARCH}/liblzma.so.5")"
   [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to locate packaged liblzma shared library"
+  export_probe_environment
   cd /
 }
 
 test_dpkg() {
   local dir
+  local package_path
 
   CURRENT_STEP="dpkg"
   log_step "dpkg"
   assert_links_to_active_liblzma "$DPKG_DEB_BIN"
   dir="$(reset_test_dir dpkg)"
 
-  mkdir -p "$dir/control" "$dir/payload/usr/share/liblzma-smoke"
-  cat >"$dir/control/control" <<'EOF'
-Package: liblzma-smoke
-Version: 1.0
-Architecture: all
-Maintainer: Smoke Test <smoke@example.com>
-Description: liblzma dpkg smoke test
-EOF
-  printf 'payload unpacked through data.tar.xz\n' >"$dir/payload/usr/share/liblzma-smoke/message.txt"
+  package_path="$(bash "$DPKG_SMOKE_HELPER" "$dir")"
 
-  tar --owner=0 --group=0 --numeric-owner -C "$dir/control" -cf "$dir/control.tar" .
-  xz -9 -c "$dir/control.tar" >"$dir/control.tar.xz"
-  tar --owner=0 --group=0 --numeric-owner -C "$dir/payload" -cf "$dir/data.tar" .
-  xz -9 -c "$dir/data.tar" >"$dir/data.tar.xz"
-  printf '2.0\n' >"$dir/debian-binary"
-  ar rcs "$dir/liblzma-smoke_1.0_all.deb" \
-    "$dir/debian-binary" \
-    "$dir/control.tar.xz" \
-    "$dir/data.tar.xz"
-
-  "$DPKG_DEB_BIN" --info "$dir/liblzma-smoke_1.0_all.deb" >"$dir/info.log"
+  "$DPKG_DEB_BIN" --info "$package_path" >"$dir/info.log"
   require_contains "$dir/info.log" "Package: liblzma-smoke"
-  "$DPKG_DEB_BIN" -x "$dir/liblzma-smoke_1.0_all.deb" "$dir/extract"
+  "$DPKG_DEB_BIN" -x "$package_path" "$dir/extract"
   require_contains "$dir/extract/usr/share/liblzma-smoke/message.txt" "payload unpacked through data.tar.xz"
 }
 
@@ -193,33 +208,7 @@ test_apt() {
   assert_links_to_active_liblzma "$APT_LIB"
   dir="$(reset_test_dir apt)"
 
-  mkdir -p \
-    "$dir/pkg/DEBIAN" \
-    "$dir/pkg/usr/share/liblzma-apt-smoke" \
-    "$dir/repo/pool/main/l/liblzma-smoke" \
-    "$dir/repo/dists/stable/main/binary-amd64" \
-    "$dir/root/state/lists/partial" \
-    "$dir/root/cache/archives/partial" \
-    "$dir/root/etc/apt/sources.list.d"
-  : >"$dir/root/state/status"
-
-  cat >"$dir/pkg/DEBIAN/control" <<'EOF'
-Package: liblzma-apt-smoke
-Version: 1.0
-Architecture: all
-Maintainer: Smoke Test <smoke@example.com>
-Description: liblzma apt smoke test
-EOF
-  printf 'apt metadata via Packages.xz\n' >"$dir/pkg/usr/share/liblzma-apt-smoke/message.txt"
-  dpkg-deb --build -Zxz "$dir/pkg" "$dir/repo/pool/main/l/liblzma-smoke/liblzma-apt-smoke_1.0_all.deb" >/tmp/apt-build-pkg.log 2>&1
-
-  dpkg-scanpackages "$dir/repo/pool" /dev/null >"$dir/repo/dists/stable/main/binary-amd64/Packages" 2>"$dir/scanpackages.log"
-  xz -9 -c "$dir/repo/dists/stable/main/binary-amd64/Packages" >"$dir/repo/dists/stable/main/binary-amd64/Packages.xz"
-  apt-ftparchive release "$dir/repo/dists/stable" >"$dir/repo/dists/stable/Release"
-
-  cat >"$dir/root/etc/apt/sources.list" <<'EOF'
-deb [trusted=yes] http://127.0.0.1:18080 stable main
-EOF
+  bash "$APT_SMOKE_HELPER" "$dir"
 
   (
     set -euo pipefail
@@ -265,25 +254,7 @@ PY
 )"
   assert_links_to_active_liblzma "$module_path"
 
-  "$PYTHON_BIN" - <<'PY' >"$dir/python.log"
-import lzma
-from pathlib import Path
-
-work = Path("/tmp/liblzma-dependent-tests/python312")
-payload = (b"python lzma smoke\n" * 64) + bytes(range(64))
-compressed = lzma.compress(payload, format=lzma.FORMAT_XZ)
-assert lzma.decompress(compressed) == payload
-
-path = work / "payload.xz"
-with lzma.open(path, "wb", preset=6) as handle:
-    handle.write(payload)
-
-with lzma.open(path, "rb") as handle:
-    restored = handle.read()
-
-assert restored == payload
-print("python lzma ok")
-PY
+  "$PYTHON_BIN" "$PYTHON_LZMA_SMOKE" >"$dir/python.log"
 
   require_contains "$dir/python.log" "python lzma ok"
 }
@@ -296,12 +267,7 @@ test_libxml2() {
   assert_links_to_active_liblzma "$LIBXML2_SO"
   dir="$(reset_test_dir libxml2)"
 
-  cat >"$dir/document.xml" <<'EOF'
-<root>
-  <item>libxml2 through xz</item>
-</root>
-EOF
-  xz -9 -c "$dir/document.xml" >"$dir/document.xml.xz"
+  xz -9 -c "$LIBXML2_SMOKE_DOC" >"$dir/document.xml.xz"
 
   "$XMLLINT_BIN" --xpath 'string(/root/item)' "$dir/document.xml.xz" >"$dir/xmllint.out"
   require_contains "$dir/xmllint.out" "libxml2 through xz"
@@ -315,82 +281,13 @@ test_libtiff6() {
   assert_links_to_active_liblzma "$LIBTIFF_SO"
   dir="$(reset_test_dir libtiff6)"
 
-  cat >"$dir/libtiff_smoke.c" <<'EOF'
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include <tiffio.h>
-
-int main(int argc, char **argv) {
-  const char *path = argv[1];
-  const uint32_t width = 4;
-  const uint32_t height = 4;
-  uint16_t compression = 0;
-  uint8_t rows[4][4] = {
-    {0, 1, 2, 3},
-    {4, 5, 6, 7},
-    {8, 9, 10, 11},
-    {12, 13, 14, 15},
-  };
-
-  TIFF *out = TIFFOpen(path, "w");
-  if (out == NULL) {
-    return 1;
-  }
-
-  TIFFSetField(out, TIFFTAG_IMAGEWIDTH, width);
-  TIFFSetField(out, TIFFTAG_IMAGELENGTH, height);
-  TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);
-  TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8);
-  TIFFSetField(out, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
-  TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-  TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-  TIFFSetField(out, TIFFTAG_COMPRESSION, COMPRESSION_LZMA);
-  TIFFSetField(out, TIFFTAG_ROWSPERSTRIP, height);
-
-  for (uint32_t row = 0; row < height; ++row) {
-    if (TIFFWriteScanline(out, rows[row], row, 0) != 1) {
-      TIFFClose(out);
-      return 2;
-    }
-  }
-
-  TIFFClose(out);
-
-  TIFF *in = TIFFOpen(path, "r");
-  if (in == NULL) {
-    return 3;
-  }
-
-  TIFFGetField(in, TIFFTAG_COMPRESSION, &compression);
-  if (compression != COMPRESSION_LZMA) {
-    TIFFClose(in);
-    return 4;
-  }
-
-  for (uint32_t row = 0; row < height; ++row) {
-    uint8_t scanline[4];
-    if (TIFFReadScanline(in, scanline, row, 0) != 1) {
-      TIFFClose(in);
-      return 5;
-    }
-    if (memcmp(scanline, rows[row], sizeof(scanline)) != 0) {
-      TIFFClose(in);
-      return 6;
-    }
-  }
-
-  TIFFClose(in);
-  puts("libtiff lzma ok");
-  return 0;
-}
-EOF
-
   cc \
+    -I"$INCLUDE_ROOT" \
     -o "$dir/libtiff-smoke" \
-    "$dir/libtiff_smoke.c" \
+    "$LIBTIFF_SMOKE_SRC" \
     $(pkg-config --cflags --libs libtiff-4) \
     >/tmp/libtiff-build.log 2>&1
+  assert_links_to_active_liblzma "$dir/libtiff-smoke"
   "$dir/libtiff-smoke" "$dir/lzma.tiff" >"$dir/libtiff.log"
   require_contains "$dir/libtiff.log" "libtiff lzma ok"
 }
@@ -420,10 +317,7 @@ test_kmod() {
   assert_links_to_active_liblzma "$MODINFO_BIN"
   dir="$(reset_test_dir kmod)"
 
-  cat >"$dir/module.c" <<'EOF'
-void liblzma_smoke(void) {}
-EOF
-  gcc -c -o "$dir/module.o" "$dir/module.c" >/tmp/kmod-build.log 2>&1
+  gcc -c -o "$dir/module.o" "$KMOD_SMOKE_SRC" >/tmp/kmod-build.log 2>&1
   printf 'description=liblzma kmod smoke\0license=GPL\0name=liblzma_smoke\0' >"$dir/modinfo.bin"
   objcopy \
     --add-section .modinfo="$dir/modinfo.bin" \
@@ -445,22 +339,7 @@ test_gdb() {
   assert_links_to_active_liblzma "$GDB_BIN"
   dir="$(reset_test_dir gdb)"
 
-  cat >"$dir/gdb_smoke.c" <<'EOF'
-#include <stdio.h>
-
-__attribute__((noinline))
-static int helper(int input) {
-  int local = input + 7;
-  puts("helper");
-  return local * 3;
-}
-
-int main(void) {
-  return helper(5) == 36 ? 0 : 1;
-}
-EOF
-
-  gcc -g -O0 -fno-inline -o "$dir/gdb-smoke" "$dir/gdb_smoke.c" >/tmp/gdb-build.log 2>&1
+  gcc -g -O0 -fno-inline -I"$INCLUDE_ROOT" -o "$dir/gdb-smoke" "$GDB_SMOKE_SRC" >/tmp/gdb-build.log 2>&1
   objcopy --only-keep-debug "$dir/gdb-smoke" "$dir/gdb-smoke.debug"
   strip --strip-debug "$dir/gdb-smoke"
   xz -9 -c "$dir/gdb-smoke.debug" >"$dir/gdb-smoke.debug.xz"
@@ -472,7 +351,7 @@ EOF
 
   "$GDB_BIN" -q -nx -batch \
     -ex 'set debuginfod enabled off' \
-    -ex 'break gdb_smoke.c:6' \
+    -ex 'break gdb_smoke.c:11' \
     -ex 'run' \
     -ex 'info locals' \
     "$dir/gdb-smoke" >"$dir/gdb.log" 2>&1
@@ -506,20 +385,10 @@ test_libarchive_tools() {
   assert_links_to_active_liblzma "$BSDCAT_BIN"
   dir="$(reset_test_dir libarchive-tools)"
 
-  mkdir -p "$dir/input/archive"
-  printf 'libarchive tools tar.xz smoke\n' >"$dir/input/archive/message.txt"
-
-  "$BSDTAR_BIN" -acf "$dir/archive.tar.xz" -C "$dir/input" . >"$dir/create.log" 2>&1
-  "$BSDTAR_BIN" -tf "$dir/archive.tar.xz" >"$dir/list.log"
+  bash "$LIBARCHIVE_TOOLS_SMOKE" "$dir" >"$dir/libarchive-tools.log"
+  require_contains "$dir/libarchive-tools.log" "libarchive tools ok"
   require_contains "$dir/list.log" "message.txt"
-
-  mkdir -p "$dir/output"
-  "$BSDTAR_BIN" -xf "$dir/archive.tar.xz" -C "$dir/output" >"$dir/extract.log" 2>&1
   require_contains "$dir/output/archive/message.txt" "libarchive tools tar.xz smoke"
-
-  printf 'libarchive tools bsdcat smoke\n' >"$dir/payload.txt"
-  xz -9 -c "$dir/payload.txt" >"$dir/payload.txt.xz"
-  "$BSDCAT_BIN" "$dir/payload.txt.xz" >"$dir/bsdcat.log"
   require_contains "$dir/bsdcat.log" "libarchive tools bsdcat smoke"
 }
 
@@ -612,50 +481,21 @@ test_libboost_iostreams1830() {
   assert_links_to_active_liblzma "$BOOST_IOSTREAMS_SO"
   dir="$(reset_test_dir boost)"
 
-  cat >"$dir/boost_smoke.cpp" <<'EOF'
-#include <boost/iostreams/close.hpp>
-#include <boost/iostreams/filter/lzma.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-#include <sstream>
-#include <string>
-#include <iostream>
-
-namespace bio = boost::iostreams;
-
-int main() {
-  const std::string payload = std::string(4096, 'x') + " libboost-iostreams lzma";
-  std::stringstream compressed;
-  std::stringstream restored;
-
-  {
-    bio::filtering_ostream out;
-    out.push(bio::lzma_compressor());
-    out.push(compressed);
-    out << payload;
-    bio::close(out);
-  }
-
-  {
-    std::stringstream input(compressed.str());
-    bio::filtering_istream in;
-    in.push(bio::lzma_decompressor());
-    in.push(input);
-    restored << in.rdbuf();
-  }
-
-  if (restored.str() != payload) {
-    return 1;
-  }
-
-  std::cout << "boost lzma ok\n";
-  return 0;
-}
-EOF
-
-  g++ -std=c++17 -O2 -o "$dir/boost-smoke" "$dir/boost_smoke.cpp" -lboost_iostreams >/tmp/boost-build.log 2>&1
+  g++ -std=c++17 -O2 -I"$INCLUDE_ROOT" -o "$dir/boost-smoke" "$BOOST_IOSTREAMS_SMOKE_SRC" -lboost_iostreams >/tmp/boost-build.log 2>&1
+  assert_links_to_active_liblzma "$dir/boost-smoke"
   "$dir/boost-smoke" >"$dir/boost.log"
   require_contains "$dir/boost.log" "boost lzma ok"
 }
+
+assert_tracked_file "$PYTHON_LZMA_SMOKE"
+assert_tracked_file "$LIBTIFF_SMOKE_SRC"
+assert_tracked_file "$GDB_SMOKE_SRC"
+assert_tracked_file "$BOOST_IOSTREAMS_SMOKE_SRC"
+assert_tracked_file "$LIBARCHIVE_TOOLS_SMOKE"
+assert_tracked_file "$DPKG_SMOKE_HELPER"
+assert_tracked_file "$APT_SMOKE_HELPER"
+assert_tracked_file "$LIBXML2_SMOKE_DOC"
+assert_tracked_file "$KMOD_SMOKE_SRC"
 
 case "$IMPLEMENTATION" in
   original)

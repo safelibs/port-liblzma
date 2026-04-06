@@ -1,0 +1,66 @@
+{
+  "implementation": "safe",
+  "safe_package_dir": "/home/yans/code/safelibs/ported/liblzma/safe/dist",
+  "results": [
+    {
+      "binary_package": "dpkg",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/dpkg.log"
+    },
+    {
+      "binary_package": "apt",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/apt.log"
+    },
+    {
+      "binary_package": "python3.12",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/python3.12.log"
+    },
+    {
+      "binary_package": "libxml2",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/libxml2.log"
+    },
+    {
+      "binary_package": "libtiff6",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/libtiff6.log"
+    },
+    {
+      "binary_package": "squashfs-tools",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/squashfs-tools.log"
+    },
+    {
+      "binary_package": "kmod",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/kmod.log"
+    },
+    {
+      "binary_package": "gdb",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/gdb.log"
+    },
+    {
+      "binary_package": "libarchive13t64",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/libarchive13t64.log"
+    },
+    {
+      "binary_package": "libarchive-tools",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/libarchive-tools.log"
+    },
+    {
+      "binary_package": "mariadb-plugin-provider-lzma",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/mariadb-plugin-provider-lzma.log"
+    },
+    {
+      "binary_package": "libboost-iostreams1.83.0",
+      "status": "passed",
+      "log_path": "safe/tests/generated/dependent-matrix/libboost-iostreams1.83.0.log"
+    }
+  ]
+}

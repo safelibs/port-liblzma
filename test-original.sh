@@ -95,6 +95,22 @@ done
   exit 1
 }
 
+for tracked_asset in \
+  "$ROOT/safe/tests/dependents/python_lzma_smoke.py" \
+  "$ROOT/safe/tests/dependents/libtiff_smoke.c" \
+  "$ROOT/safe/tests/dependents/gdb_smoke.c" \
+  "$ROOT/safe/tests/dependents/boost_iostreams_smoke.cpp" \
+  "$ROOT/safe/tests/dependents/libarchive_tools_smoke.sh" \
+  "$ROOT/safe/tests/dependents/create_dpkg_smoke_package.sh" \
+  "$ROOT/safe/tests/dependents/create_apt_smoke_repo.sh" \
+  "$ROOT/safe/tests/dependents/libxml2_document.xml" \
+  "$ROOT/safe/tests/dependents/kmod_smoke_module.c"; do
+  [[ -f "$tracked_asset" ]] || {
+    printf 'missing tracked dependent asset: %s\n' "${tracked_asset#"$ROOT/"}" >&2
+    exit 1
+  }
+done
+
 python3 - "$ROOT/dependents.json" "$ONLY" <<'PY'
 import json
 import sys
@@ -157,6 +173,7 @@ docker run \
   --security-opt seccomp=unconfined \
   -e "LIBLZMA_TEST_ONLY=$ONLY" \
   -e "LIBLZMA_IMPLEMENTATION=$IMPLEMENTATION" \
+  -e "LIBLZMA_READ_ONLY_ROOT=/work" \
   -v "$ROOT:/work:ro" \
   "$IMAGE_TAG" \
   bash /work/safe/scripts/run-dependent-smokes.sh
