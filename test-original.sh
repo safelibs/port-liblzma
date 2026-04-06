@@ -16,6 +16,8 @@ usage: test-original.sh [--only <binary-package>] [--implementation <original|sa
 Builds and tests either the vendored original liblzma or the packaged safe
 replacement inside Docker, then smoke-tests the Ubuntu 24.04 dependent
 packages recorded in dependents.json against the selected implementation.
+Safe mode builds the image with the staged liblzma5/liblzma-dev packages and
+then exercises the installed headers and runtime inside that image.
 
 --only runs just one dependent by exact .dependents[].binary_package.
 --implementation defaults to original.

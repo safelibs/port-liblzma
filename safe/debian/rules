@@ -70,5 +70,8 @@ override_dh_auto_install:
 override_dh_auto_test:
 	:
 
+override_dh_missing:
+	dh_missing --fail-missing
+
 override_dh_makeshlibs:
 	dh_makeshlibs -pliblzma5

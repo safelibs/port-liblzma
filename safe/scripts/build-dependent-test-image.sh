@@ -93,6 +93,25 @@ have_safe_artifacts() {
     && compgen -G "$dir/liblzma-safe_*.changes" >/dev/null
 }
 
+resolve_single_artifact() {
+  local dir="$1"
+  local pattern="$2"
+  local description="$3"
+  local -a matches=()
+
+  shopt -s nullglob
+  matches=("$dir"/$pattern)
+  shopt -u nullglob
+
+  if [[ "${#matches[@]}" -ne 1 ]]; then
+    printf 'expected exactly one %s in %s matching %s, found %s\n' \
+      "$description" "$dir" "$pattern" "${#matches[@]}" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${matches[0]}"
+}
+
 refresh_safe_artifacts() {
   local target_dir="$1"
 
@@ -134,13 +153,21 @@ cp "$dockerfile" "$build_context/Dockerfile"
 mkdir -p "$build_context/packages"
 
 if [[ "$implementation" == "safe" ]]; then
+  runtime_pkg=""
+  dev_pkg=""
+  buildinfo=""
+  changes=""
+
   refresh_safe_artifacts "$safe_package_dir"
-  cp -f \
-    "$safe_package_dir"/liblzma5_*.deb \
-    "$safe_package_dir"/liblzma-dev_*.deb \
-    "$safe_package_dir"/liblzma-safe_*.buildinfo \
-    "$safe_package_dir"/liblzma-safe_*.changes \
-    "$build_context/packages"/
+  runtime_pkg="$(resolve_single_artifact "$safe_package_dir" 'liblzma5_*.deb' 'liblzma5 package')"
+  dev_pkg="$(resolve_single_artifact "$safe_package_dir" 'liblzma-dev_*.deb' 'liblzma-dev package')"
+  buildinfo="$(resolve_single_artifact "$safe_package_dir" 'liblzma-safe_*.buildinfo' 'buildinfo artifact')"
+  changes="$(resolve_single_artifact "$safe_package_dir" 'liblzma-safe_*.changes' 'changes artifact')"
+
+  cp -f "$runtime_pkg" "$build_context/packages/liblzma5.deb"
+  cp -f "$dev_pkg" "$build_context/packages/liblzma-dev.deb"
+  cp -f "$buildinfo" "$build_context/packages/liblzma-safe.buildinfo"
+  cp -f "$changes" "$build_context/packages/liblzma-safe.changes"
 fi
 
 docker build \

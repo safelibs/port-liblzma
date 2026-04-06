@@ -22,7 +22,8 @@ usage: $(basename "$0") [--package-dir <dir>]
 
 Installs the built liblzma5/liblzma-dev packages into a clean Ubuntu 24.04
 container, probes the pkg-config and header interface, compiles and runs a
-trivial consumer, and verifies the documentation links shipped by liblzma-dev.
+trivial consumer, verifies the installed headers match safe/include/, and
+checks the documentation links shipped by liblzma-dev.
 EOF
 }
 
@@ -129,6 +130,8 @@ require_path "/usr/include/lzma.h"
 require_path "/usr/include/lzma"
 require_path "/usr/lib/${multiarch}/liblzma.so"
 require_path "/usr/lib/${multiarch}/pkgconfig/liblzma.pc"
+[[ "$(pkg-config --variable=includedir liblzma)" == "/usr/include" ]] || die "pkg-config includedir did not resolve to /usr/include"
+[[ "$(pkg-config --variable=libdir liblzma)" == "/usr/lib/${multiarch}" ]] || die "pkg-config libdir did not resolve to /usr/lib/${multiarch}"
 
 pkg_config_flags="$(pkg-config --cflags --libs liblzma)"
 pkg_config_version="$(pkg-config --modversion liblzma)"
@@ -164,6 +167,17 @@ resolved_probe="$(ldd /tmp/liblzma-dev-probe | awk '$1 == "liblzma.so.5" { print
   ldd /tmp/liblzma-dev-probe >&2
   exit 1
 }
+
+while IFS= read -r tracked_header; do
+  rel_path="${tracked_header#/work/safe/include/}"
+  installed_header="/usr/include/${rel_path}"
+
+  require_path "$installed_header"
+  cmp -s "$tracked_header" "$installed_header" || {
+    printf 'installed header mismatch: %s\n' "$installed_header" >&2
+    exit 1
+  }
+done < <(find /work/safe/include -type f | sort)
 
 while read -r target link; do
   [[ -n "${target:-}" ]] || continue

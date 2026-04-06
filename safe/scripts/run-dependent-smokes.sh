@@ -15,8 +15,8 @@ CURRENT_STEP=""
 MULTIARCH="$(gcc -print-multiarch)"
 MULTIARCH_LIBDIR="/usr/lib/${MULTIARCH}"
 TRACKED_ROOT="${READ_ONLY_ROOT}/safe/tests/dependents"
-INCLUDE_ROOT="${READ_ONLY_ROOT}/safe/include"
 ACTIVE_LIBLZMA=""
+ACTIVE_INCLUDE_ROOT=""
 APT_LIB="${MULTIARCH_LIBDIR}/libapt-pkg.so.6.0"
 LIBXML2_SO="${MULTIARCH_LIBDIR}/libxml2.so.2"
 LIBTIFF_SO="${MULTIARCH_LIBDIR}/libtiff.so.6"
@@ -60,7 +60,7 @@ die() {
 
 export_probe_environment() {
   export LIBLZMA_DEPENDENT_ACTIVE_LIBLZMA="$ACTIVE_LIBLZMA"
-  export LIBLZMA_DEPENDENT_INCLUDE_DIR="$INCLUDE_ROOT"
+  export LIBLZMA_DEPENDENT_INCLUDE_DIR="$ACTIVE_INCLUDE_ROOT"
   export LIBLZMA_DEPENDENT_MULTIARCH="$MULTIARCH"
   export LIBLZMA_DEPENDENT_MULTIARCH_LIBDIR="$MULTIARCH_LIBDIR"
   export LIBLZMA_DEPENDENT_REPO_ROOT="$READ_ONLY_ROOT"
@@ -161,7 +161,9 @@ build_original_liblzma() {
   export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 
   ACTIVE_LIBLZMA="$(readlink -f /usr/local/lib/liblzma.so.5)"
+  ACTIVE_INCLUDE_ROOT="/usr/local/include"
   [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to install local liblzma shared library"
+  assert_exists "$ACTIVE_INCLUDE_ROOT/lzma.h"
   export_probe_environment
   cd /
 }
@@ -178,7 +180,9 @@ select_safe_liblzma() {
   ldconfig
 
   ACTIVE_LIBLZMA="$(readlink -f "/usr/lib/${MULTIARCH}/liblzma.so.5")"
+  ACTIVE_INCLUDE_ROOT="/usr/include"
   [[ -n "$ACTIVE_LIBLZMA" && -f "$ACTIVE_LIBLZMA" ]] || die "failed to locate packaged liblzma shared library"
+  assert_exists "$ACTIVE_INCLUDE_ROOT/lzma.h"
   export_probe_environment
   cd /
 }
@@ -282,7 +286,7 @@ test_libtiff6() {
   dir="$(reset_test_dir libtiff6)"
 
   cc \
-    -I"$INCLUDE_ROOT" \
+    -I"$ACTIVE_INCLUDE_ROOT" \
     -o "$dir/libtiff-smoke" \
     "$LIBTIFF_SMOKE_SRC" \
     $(pkg-config --cflags --libs libtiff-4) \
@@ -339,7 +343,7 @@ test_gdb() {
   assert_links_to_active_liblzma "$GDB_BIN"
   dir="$(reset_test_dir gdb)"
 
-  gcc -g -O0 -fno-inline -I"$INCLUDE_ROOT" -o "$dir/gdb-smoke" "$GDB_SMOKE_SRC" >/tmp/gdb-build.log 2>&1
+  gcc -g -O0 -fno-inline -I"$ACTIVE_INCLUDE_ROOT" -o "$dir/gdb-smoke" "$GDB_SMOKE_SRC" >/tmp/gdb-build.log 2>&1
   objcopy --only-keep-debug "$dir/gdb-smoke" "$dir/gdb-smoke.debug"
   strip --strip-debug "$dir/gdb-smoke"
   xz -9 -c "$dir/gdb-smoke.debug" >"$dir/gdb-smoke.debug.xz"
@@ -481,7 +485,7 @@ test_libboost_iostreams1830() {
   assert_links_to_active_liblzma "$BOOST_IOSTREAMS_SO"
   dir="$(reset_test_dir boost)"
 
-  g++ -std=c++17 -O2 -I"$INCLUDE_ROOT" -o "$dir/boost-smoke" "$BOOST_IOSTREAMS_SMOKE_SRC" -lboost_iostreams >/tmp/boost-build.log 2>&1
+  g++ -std=c++17 -O2 -I"$ACTIVE_INCLUDE_ROOT" -o "$dir/boost-smoke" "$BOOST_IOSTREAMS_SMOKE_SRC" -lboost_iostreams >/tmp/boost-build.log 2>&1
   assert_links_to_active_liblzma "$dir/boost-smoke"
   "$dir/boost-smoke" >"$dir/boost.log"
   require_contains "$dir/boost.log" "boost lzma ok"

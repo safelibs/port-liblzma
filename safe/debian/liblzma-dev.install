@@ -1,5 +1,5 @@
-usr/include/*
-usr/include/lzma/*
-usr/lib/*/lib*.a
-usr/lib/*/lib*.so
-usr/lib/*/pkgconfig/*
+usr/include/lzma.h
+usr/include/lzma/*.h
+usr/lib/*/liblzma.a
+usr/lib/*/liblzma.so
+usr/lib/*/pkgconfig/liblzma.pc
