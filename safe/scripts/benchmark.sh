@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Serial-only script: this rebuilds and relinks the release shared library in
+# place before benchmarking it. Do not run it concurrently with
+# relink-release-shared.sh, release-verify.sh, compare-exports.sh,
+# check-symbol-versions.sh, build-deb.sh, or other jobs that rewrite
+# safe/target/release/, safe/target/relink/, or safe/dist/.
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 safe_dir=$(cd "$script_dir/.." && pwd)
 repo_root=$(cd "$safe_dir/.." && pwd)

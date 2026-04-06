@@ -1,12 +1,14 @@
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_allocator, lzma_block, lzma_filter, lzma_ret, lzma_vli, LZMA_DATA_ERROR, LZMA_OK,
-    LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_VLI_UNKNOWN,
+    lzma_allocator, lzma_block, lzma_ret, lzma_vli, LZMA_DATA_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR,
+    LZMA_PROG_ERROR, LZMA_VLI_UNKNOWN,
 };
 use crate::internal::check;
 use crate::internal::common::{LZMA_CHECK_ID_MAX, LZMA_VLI_MAX};
-use crate::internal::filter::{self, filter_flags_decode_impl, filter_flags_encode_impl, filter_flags_size_impl};
+use crate::internal::filter::{
+    self, filter_flags_decode_impl, filter_flags_encode_impl, filter_flags_size_impl,
+};
 use crate::internal::index::core::{UNPADDED_SIZE_MAX, UNPADDED_SIZE_MIN};
 use crate::internal::vli::{lzma_vli_decode_impl, lzma_vli_encode_impl, lzma_vli_size_impl};
 
@@ -144,7 +146,12 @@ pub(crate) unsafe fn block_header_encode(block: *const lzma_block, output: *mut 
             return LZMA_PROG_ERROR;
         }
 
-        let ret = filter_flags_encode_impl((*block).filters.add(filter_count), output, &mut out_pos, out_size);
+        let ret = filter_flags_encode_impl(
+            (*block).filters.add(filter_count),
+            output,
+            &mut out_pos,
+            out_size,
+        );
         if ret != LZMA_OK {
             return ret;
         }
@@ -157,7 +164,10 @@ pub(crate) unsafe fn block_header_encode(block: *const lzma_block, output: *mut 
 
     *output.add(1) |= (filter_count - 1) as u8;
     ptr::write_bytes(output.add(out_pos), 0, out_size - out_pos);
-    write32le(output.add(out_size), check::crc32::crc32(core::slice::from_raw_parts(output, out_size), 0));
+    write32le(
+        output.add(out_size),
+        check::crc32::crc32(core::slice::from_raw_parts(output, out_size), 0),
+    );
     LZMA_OK
 }
 
@@ -188,7 +198,9 @@ pub(crate) unsafe fn block_header_decode(
     }
 
     let in_size = (*block).header_size.saturating_sub(4) as usize;
-    if check::crc32::crc32(core::slice::from_raw_parts(input, in_size), 0) != read32le(input.add(in_size)) {
+    if check::crc32::crc32(core::slice::from_raw_parts(input, in_size), 0)
+        != read32le(input.add(in_size))
+    {
         return LZMA_DATA_ERROR;
     }
 
@@ -198,7 +210,13 @@ pub(crate) unsafe fn block_header_decode(
 
     let mut in_pos = 2usize;
     if (*input.add(1) & 0x40) != 0 {
-        let ret = lzma_vli_decode_impl(&mut (*block).compressed_size, ptr::null_mut(), input, &mut in_pos, in_size);
+        let ret = lzma_vli_decode_impl(
+            &mut (*block).compressed_size,
+            ptr::null_mut(),
+            input,
+            &mut in_pos,
+            in_size,
+        );
         if ret != LZMA_OK {
             return ret;
         }
@@ -210,7 +228,13 @@ pub(crate) unsafe fn block_header_decode(
     }
 
     if (*input.add(1) & 0x80) != 0 {
-        let ret = lzma_vli_decode_impl(&mut (*block).uncompressed_size, ptr::null_mut(), input, &mut in_pos, in_size);
+        let ret = lzma_vli_decode_impl(
+            &mut (*block).uncompressed_size,
+            ptr::null_mut(),
+            input,
+            &mut in_pos,
+            in_size,
+        );
         if ret != LZMA_OK {
             return ret;
         }
@@ -220,7 +244,13 @@ pub(crate) unsafe fn block_header_decode(
 
     let filter_count = ((*input.add(1) & 3) + 1) as usize;
     for i in 0..filter_count {
-        let ret = filter_flags_decode_impl((*block).filters.add(i), allocator, input, &mut in_pos, in_size);
+        let ret = filter_flags_decode_impl(
+            (*block).filters.add(i),
+            allocator,
+            input,
+            &mut in_pos,
+            in_size,
+        );
         if ret != LZMA_OK {
             filter::filters_free_impl((*block).filters, allocator);
             return ret;
@@ -238,12 +268,16 @@ pub(crate) unsafe fn block_header_decode(
     LZMA_OK
 }
 
-pub(crate) unsafe fn block_compressed_size(block: *mut lzma_block, unpadded_size: lzma_vli) -> lzma_ret {
+pub(crate) unsafe fn block_compressed_size(
+    block: *mut lzma_block,
+    unpadded_size: lzma_vli,
+) -> lzma_ret {
     if block_unpadded_size(block.cast_const()) == 0 {
         return LZMA_PROG_ERROR;
     }
 
-    let container_size = u64::from((*block).header_size) + u64::from(check::check_size((*block).check));
+    let container_size =
+        u64::from((*block).header_size) + u64::from(check::check_size((*block).check));
     if unpadded_size <= container_size {
         return LZMA_DATA_ERROR;
     }
@@ -282,8 +316,9 @@ pub(crate) unsafe fn block_unpadded_size(block: *const lzma_block) -> lzma_vli {
         return LZMA_VLI_UNKNOWN;
     }
 
-    let unpadded =
-        (*block).compressed_size + u64::from((*block).header_size) + u64::from(check::check_size((*block).check));
+    let unpadded = (*block).compressed_size
+        + u64::from((*block).header_size)
+        + u64::from(check::check_size((*block).check));
     if unpadded < UNPADDED_SIZE_MIN || unpadded > UNPADDED_SIZE_MAX {
         return 0;
     }

@@ -9,6 +9,7 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive-too
 #2 DONE 0.0s
 
 #3 [internal] load .dockerignore
+#3 transferring context:
 #3 transferring context: 2B done
 #3 DONE 0.1s
 
@@ -27,7 +28,7 @@ $ /home/yans/code/safelibs/ported/liblzma/test-original.sh --only libarchive-too
 
 #8 exporting to image
 #8 exporting layers done
-#8 writing image sha256:a57c762f361a135bcc475bd3074a726f813cbbef553064801f214c5bdb5e6912 done
+#8 writing image sha256:03a234848f1c5c31de8a20717226f2eaa5374e0812c6cf293309911bbb147156 done
 #8 naming to docker.io/library/liblzma-dependent-test:ubuntu24.04-safe done
 #8 DONE 0.0s
 liblzma-dependent-test:ubuntu24.04-safe

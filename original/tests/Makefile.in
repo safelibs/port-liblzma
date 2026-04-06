@@ -100,7 +100,8 @@ TESTS = test_check$(EXEEXT) test_hardware$(EXEEXT) \
 	test_index$(EXEEXT) test_index_hash$(EXEEXT) \
 	test_bcj_exact_size$(EXEEXT) test_memlimit$(EXEEXT) \
 	test_lzip_decoder$(EXEEXT) test_public_api$(EXEEXT) \
-	test_vli$(EXEEXT) test_files.sh test_compress_prepared_bcj_sparc \
+	test_vli$(EXEEXT) test_files.sh \
+	test_compress_prepared_bcj_sparc \
 	test_compress_prepared_bcj_x86 test_compress_generated_abc \
 	test_compress_generated_random test_compress_generated_text \
 	$(am__append_1)
@@ -253,14 +254,12 @@ SOURCES = create_compress_files.c test_bcj_exact_size.c \
 	test_block_header.c test_check.c test_filter_flags.c \
 	test_filter_str.c test_hardware.c test_index.c \
 	test_index_hash.c test_lzip_decoder.c test_memlimit.c \
-	test_public_api.c \
-	test_stream_flags.c test_vli.c
+	test_public_api.c test_stream_flags.c test_vli.c
 DIST_SOURCES = create_compress_files.c test_bcj_exact_size.c \
 	test_block_header.c test_check.c test_filter_flags.c \
 	test_filter_str.c test_hardware.c test_index.c \
 	test_index_hash.c test_lzip_decoder.c test_memlimit.c \
-	test_public_api.c \
-	test_stream_flags.c test_vli.c
+	test_public_api.c test_stream_flags.c test_vli.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1087,16 +1086,16 @@ test_memlimit.log: test_memlimit$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-test_public_api.log: test_public_api$(EXEEXT)
-	@p='test_public_api$(EXEEXT)'; \
-	b='test_public_api'; \
+test_lzip_decoder.log: test_lzip_decoder$(EXEEXT)
+	@p='test_lzip_decoder$(EXEEXT)'; \
+	b='test_lzip_decoder'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-test_lzip_decoder.log: test_lzip_decoder$(EXEEXT)
-	@p='test_lzip_decoder$(EXEEXT)'; \
-	b='test_lzip_decoder'; \
+test_public_api.log: test_public_api$(EXEEXT)
+	@p='test_public_api$(EXEEXT)'; \
+	b='test_public_api'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

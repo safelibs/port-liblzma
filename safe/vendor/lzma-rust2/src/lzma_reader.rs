@@ -217,7 +217,16 @@ impl<R: Read> LzmaReader<R> {
         dict_size: u32,
         preset_dict: Option<&[u8]>,
     ) -> crate::Result<Self> {
-        Self::construct2(reader, uncomp_size, lc, lp, pb, dict_size, preset_dict, true)
+        Self::construct2(
+            reader,
+            uncomp_size,
+            lc,
+            lp,
+            pb,
+            dict_size,
+            preset_dict,
+            true,
+        )
     }
 
     fn read_decode(&mut self, buf: &mut [u8]) -> crate::Result<usize> {

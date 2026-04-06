@@ -46,12 +46,19 @@ pub(crate) unsafe fn options_to_start_offset(
     kind: SimpleFilterKind,
     options: *const lzma_options_bcj,
 ) -> Result<u32, lzma_ret> {
-    let offset = if options.is_null() { 0 } else { (*options).start_offset };
+    let offset = if options.is_null() {
+        0
+    } else {
+        (*options).start_offset
+    };
     validate_alignment(kind, offset)?;
     Ok(offset)
 }
 
-pub(crate) fn validate_alignment(kind: SimpleFilterKind, start_offset: u32) -> Result<(), lzma_ret> {
+pub(crate) fn validate_alignment(
+    kind: SimpleFilterKind,
+    start_offset: u32,
+) -> Result<(), lzma_ret> {
     if start_offset % kind.alignment() != 0 {
         return Err(LZMA_OPTIONS_ERROR);
     }

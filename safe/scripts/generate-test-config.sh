@@ -18,7 +18,8 @@ awk '
 { print }
 END {
   print ""
-  print "/* Phase 06: single-threaded container APIs and the upstream helper harness are enabled. */"
+  print "/* Final signoff: mirrored from build/config.h for the safe upstream and extra C harnesses. */"
+  print "/* Regenerate with safe/scripts/generate-test-config.sh after configure-state changes. */"
 }
 ' "$src" > "$tmp"
 

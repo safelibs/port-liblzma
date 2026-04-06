@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Serial-only script: this rewrites safe/target/relink/ and
+# safe/target/release/liblzma.so{,.5}. Do not run it concurrently with
+# release-verify.sh, benchmark.sh, compare-exports.sh, check-symbol-versions.sh,
+# build-deb.sh, or any other command that repackages safe/dist/ from the same
+# worktree.
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd "$script_dir/../.." && pwd)
 safe_dir="$repo_root/safe"

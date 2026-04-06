@@ -601,4 +601,5 @@
    pointer, if such a type exists, and if the system does not define it. */
 /* #undef uintptr_t */
 
-/* Phase 06: single-threaded container APIs and the upstream helper harness are enabled. */
+/* Final signoff: mirrored from build/config.h for the safe upstream and extra C harnesses. */
+/* Regenerate with safe/scripts/generate-test-config.sh after configure-state changes. */

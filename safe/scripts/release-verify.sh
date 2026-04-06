@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Serial-only script: this cleans and rebuilds safe/target/, rewrites
+# safe/target/relink/, and repackages safe/dist/. Run it on its own and do not
+# overlap it with relink-release-shared.sh, benchmark.sh, compare-exports.sh,
+# check-symbol-versions.sh, or other package/release jobs in the same worktree.
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 safe_dir=$(cd "$script_dir/.." && pwd)
 repo_root=$(cd "$safe_dir/.." && pwd)

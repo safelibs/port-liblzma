@@ -1,6 +1,11 @@
 # Safety Audit
 
-This phase audited the Rust `liblzma` port with two goals:
+This final hardening and signoff pass audited the Rust `liblzma` port against
+the retained non-memory-corruption scope in `relevant_cves.json`. That scope is
+intentionally centered on CVE-2024-3094: release integrity, supply-chain
+control, and proof that shipped artifacts come from auditable tracked sources.
+
+The final audit kept two goals in scope:
 
 1. Keep `unsafe` confined to the ABI and layout boundaries that the public `liblzma` contract makes unavoidable.
 2. Prove the shipped `safe/` artifacts are built from auditable, tracked source inputs and do not functionally depend on `original/`, `build/`, or `cmake-build/` implementation code.
@@ -23,6 +28,7 @@ The shipped Rust dependency graph is intentionally small: `safe-liblzma`, vendor
 - Heap objects allocated through `lzma_allocator` are created and freed through the same allocator family.
 - Multithreaded encoder and decoder workers only receive deep-copied filter arrays or opaque allocator handles; they do not share mutable Rust references across threads.
 - The package build is expected to consume tracked files from `safe/` plus the non-code upstream documentation files `original/AUTHORS`, `original/NEWS`, and `original/THANKS`. `safe/scripts/release-verify.sh` traces this explicitly.
+- The relink, symbol-check, package, release-verification, and benchmark scripts share mutable outputs under `safe/target/relink/`, `safe/target/release/`, and `safe/dist/`, so they are intentionally treated as serial-only maintenance steps.
 
 ## Remaining Unsafe Inventory
 
@@ -74,19 +80,20 @@ The shipped Rust dependency graph is intentionally small: `safe-liblzma`, vendor
 
 ## Performance Triage
 
-`safe/scripts/benchmark.sh` was rerun on 2026-04-05 and 2026-04-06 against
+`safe/scripts/benchmark.sh` was rerun on 2026-04-06 against
 `build/src/liblzma/.libs/liblzma.so.5.4.5`.
 
-- `encode-text`: about `0.23x` to `0.27x` reference throughput
-- `encode-random`: about `1.08x` to `1.23x` reference throughput
-- `decode-text`: about `0.15x` reference throughput
-- `decode-random`: about `0.10x` reference throughput
+- `encode-text`: `0.251x` reference throughput
+- `encode-random`: `1.038x` reference throughput
+- `decode-text`: `0.149x` reference throughput
+- `decode-random`: `0.105x` reference throughput
 
 The benchmark gate intentionally reports these as visible warnings instead of a release-blocking failure. The regression is concentrated in codec hot paths, not in the package, ABI, or symbol-compatibility layers audited in this phase, and compatibility plus supply-chain hardening remained the higher-priority ship criteria for this port.
 
 ## Verification Hooks
 
-- `safe/scripts/release-verify.sh` traces the package build, rejects forbidden implementation inputs, checks tracked/textual source provenance for the files the build actually consumes, compares installed headers and symbol maps to the authoritative upstream originals, and confirms the packaged library matches the freshly built Rust artifact.
+- `safe/scripts/release-verify.sh` is the authoritative final-release proof. It traces the package build, rejects forbidden implementation inputs, checks tracked/textual source provenance for the files the build actually consumes, compares installed headers and symbol maps to the authoritative upstream originals, and confirms the packaged library matches the freshly built Rust artifact.
 - `safe/scripts/run-rust-unit-tests.sh` and `safe/scripts/release-verify.sh` both exercise `safe/fuzz/` with locked offline Cargo resolution so the decode-focused harness stays in the final gate instead of drifting as a standalone workspace.
 - `safe/fuzz/` contains a decode-focused harness with the same 300 MiB memory limit posture as the upstream OSS-Fuzz target.
 - `safe/scripts/benchmark.sh` compares the Rust library against `build/src/liblzma/.libs/liblzma.so.5.4.5` on representative encode and decode workloads so regressions are visible before release.
+- `safe/scripts/relink-release-shared.sh` owns the shared relink path, and the related release/package/benchmark scripts document that those steps are serial-only so future maintainers do not overlap them in one worktree.
