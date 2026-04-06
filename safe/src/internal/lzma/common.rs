@@ -1,9 +1,9 @@
 use std::io;
 
 use crate::ffi::types::{
-    lzma_check, lzma_filter, lzma_options_bcj, lzma_options_delta, lzma_options_lzma, lzma_ret,
-    LZMA_BUF_ERROR, LZMA_CHECK_NONE, LZMA_DATA_ERROR, LZMA_MEM_ERROR, LZMA_OPTIONS_ERROR,
-    LZMA_PROG_ERROR,
+    lzma_check, lzma_filter, lzma_match_finder, lzma_options_bcj, lzma_options_delta,
+    lzma_options_lzma, lzma_ret, LZMA_BUF_ERROR, LZMA_CHECK_NONE, LZMA_DATA_ERROR, LZMA_MEM_ERROR,
+    LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR,
 };
 use crate::internal::common::{LZMA_MODE_FAST, LZMA_MODE_NORMAL};
 use crate::internal::delta;
@@ -16,10 +16,20 @@ use crate::internal::simple::{self, SimpleFilterKind};
 
 pub(crate) const LZMA_LZMA1EXT_ALLOW_EOPM: u32 = 0x01;
 pub(crate) const LZMA_MEMUSAGE_BASE: u64 = 1 << 15;
+const LZMA_MATCH_LEN_MIN: u32 = 2;
+const LZMA_MATCH_LEN_MAX: u32 = 273;
+const LZMA_LZMA_ENCODER_OPTS: u32 = 1 << 12;
+const LZMA_LZMA_LOOP_INPUT_MAX: u32 = LZMA_LZMA_ENCODER_OPTS + 1;
+const LZMA1_ENCODER_OVERHEAD: u64 = 249_792;
+const LZMA2_ENCODER_OVERHEAD: u64 = 315_496;
+const LZMA1_DECODER_OVERHEAD: u64 = 32_640;
+const LZMA2_DECODER_OVERHEAD: u64 = 32_824;
 
 #[derive(Clone)]
 pub(crate) enum Prefilter {
-    Delta { distance: usize },
+    Delta {
+        distance: usize,
+    },
     Simple {
         kind: SimpleFilterKind,
         start_offset: u32,
@@ -30,11 +40,13 @@ pub(crate) enum Prefilter {
 pub(crate) enum TerminalFilter {
     Lzma1 {
         options: lzma_rust2::LzmaOptions,
+        match_finder: lzma_match_finder,
         allow_eopm: bool,
         expected_uncompressed_size: Option<u64>,
     },
     Lzma2 {
         options: lzma_rust2::Lzma2Options,
+        match_finder: lzma_match_finder,
     },
 }
 
@@ -90,7 +102,8 @@ fn map_lzma_options(options: &lzma_options_lzma) -> Result<lzma_rust2::LzmaOptio
         None
     } else {
         Some(unsafe {
-            std::slice::from_raw_parts(options.preset_dict, options.preset_dict_size as usize).to_vec()
+            std::slice::from_raw_parts(options.preset_dict, options.preset_dict_size as usize)
+                .to_vec()
         })
     };
 
@@ -104,7 +117,11 @@ fn map_lzma_options(options: &lzma_options_lzma) -> Result<lzma_rust2::LzmaOptio
         } else {
             map_mode(options.mode)?
         },
-        nice_len: if options.nice_len == 0 { 64 } else { options.nice_len.max(8) },
+        nice_len: if options.nice_len == 0 {
+            64
+        } else {
+            options.nice_len.max(8)
+        },
         mf: if options.mf == 0 {
             lzma_rust2::MfType::Bt4
         } else {
@@ -122,7 +139,8 @@ unsafe fn parse_prefilter(filter: &lzma_filter) -> Result<Prefilter, lzma_ret> {
     }
 
     let kind = simple::kind_from_filter_id(filter.id).ok_or(LZMA_OPTIONS_ERROR)?;
-    let start_offset = simple::options_to_start_offset(kind, filter.options.cast::<lzma_options_bcj>())?;
+    let start_offset =
+        simple::options_to_start_offset(kind, filter.options.cast::<lzma_options_bcj>())?;
     Ok(Prefilter::Simple { kind, start_offset })
 }
 
@@ -137,6 +155,7 @@ unsafe fn parse_terminal(filter: &lzma_filter) -> Result<TerminalFilter, lzma_re
     match filter.id {
         LZMA_FILTER_LZMA1 => Ok(TerminalFilter::Lzma1 {
             options: rust_options,
+            match_finder: options.mf,
             allow_eopm: false,
             expected_uncompressed_size: ext_size_from_options(options),
         }),
@@ -147,6 +166,7 @@ unsafe fn parse_terminal(filter: &lzma_filter) -> Result<TerminalFilter, lzma_re
 
             Ok(TerminalFilter::Lzma1 {
                 options: rust_options,
+                match_finder: options.mf,
                 allow_eopm: (options.ext_flags & LZMA_LZMA1EXT_ALLOW_EOPM) != 0,
                 expected_uncompressed_size: ext_size_from_options(options),
             })
@@ -156,12 +176,15 @@ unsafe fn parse_terminal(filter: &lzma_filter) -> Result<TerminalFilter, lzma_re
                 lzma_options: rust_options,
                 ..Default::default()
             },
+            match_finder: options.mf,
         }),
         _ => Err(LZMA_OPTIONS_ERROR),
     }
 }
 
-pub(crate) unsafe fn parse_filters(filters: *const lzma_filter) -> Result<ParsedFilterChain, lzma_ret> {
+pub(crate) unsafe fn parse_filters(
+    filters: *const lzma_filter,
+) -> Result<ParsedFilterChain, lzma_ret> {
     let mut count = 0usize;
     let ret = validate_chain_impl(filters, &mut count);
     if ret != 0 {
@@ -174,20 +197,70 @@ pub(crate) unsafe fn parse_filters(filters: *const lzma_filter) -> Result<Parsed
     }
 
     let terminal = parse_terminal(&*filters.add(count - 1))?;
-    Ok(ParsedFilterChain { prefilters, terminal })
+    Ok(ParsedFilterChain {
+        prefilters,
+        terminal,
+    })
 }
 
 pub(crate) unsafe fn encoder_memusage(filters: *const lzma_filter) -> u64 {
     match parse_filters(filters) {
         Ok(chain) => {
             let prefilter_usage = (chain.prefilters.len() as u64).saturating_mul(1024);
-            let terminal_usage_kib = match chain.terminal {
-                TerminalFilter::Lzma1 { options, .. } => options.get_memory_usage() as u64,
-                TerminalFilter::Lzma2 { options } => options.lzma_options.get_memory_usage() as u64,
+            let terminal_usage = match chain.terminal {
+                TerminalFilter::Lzma1 {
+                    options,
+                    match_finder,
+                    ..
+                } => {
+                    if options.nice_len < LZMA_MATCH_LEN_MIN
+                        || options.nice_len > LZMA_MATCH_LEN_MAX
+                    {
+                        return u64::MAX;
+                    }
+
+                    let core_usage = lz::encoder_memusage(
+                        options.dict_size,
+                        LZMA_LZMA_ENCODER_OPTS,
+                        LZMA_LZMA_LOOP_INPUT_MAX,
+                        LZMA_MATCH_LEN_MAX,
+                        options.nice_len,
+                        match_finder,
+                    );
+                    if core_usage == u64::MAX {
+                        return u64::MAX;
+                    }
+
+                    core_usage.saturating_add(LZMA1_ENCODER_OVERHEAD)
+                }
+                TerminalFilter::Lzma2 {
+                    options,
+                    match_finder,
+                } => {
+                    let lzma_options = &options.lzma_options;
+                    if lzma_options.nice_len < LZMA_MATCH_LEN_MIN
+                        || lzma_options.nice_len > LZMA_MATCH_LEN_MAX
+                    {
+                        return u64::MAX;
+                    }
+
+                    let core_usage = lz::encoder_memusage(
+                        lzma_options.dict_size,
+                        LZMA_LZMA_ENCODER_OPTS,
+                        LZMA_LZMA_LOOP_INPUT_MAX,
+                        LZMA_MATCH_LEN_MAX,
+                        lzma_options.nice_len,
+                        match_finder,
+                    );
+                    if core_usage == u64::MAX {
+                        return u64::MAX;
+                    }
+
+                    core_usage.saturating_add(LZMA2_ENCODER_OVERHEAD)
+                }
             };
 
-            terminal_usage_kib
-                .saturating_mul(1024)
+            terminal_usage
                 .saturating_add(prefilter_usage)
                 .saturating_add(LZMA_MEMUSAGE_BASE)
         }
@@ -199,22 +272,20 @@ pub(crate) unsafe fn decoder_memusage(filters: *const lzma_filter) -> u64 {
     match parse_filters(filters) {
         Ok(chain) => {
             let prefilter_usage = (chain.prefilters.len() as u64).saturating_mul(1024);
-            let terminal_usage_kib = match chain.terminal {
-                TerminalFilter::Lzma1 {
-                    options, ..
-                } => lzma_rust2::lzma_get_memory_usage(options.dict_size, options.lc, options.lp)
-                    .map(u64::from)
-                    .unwrap_or(u64::MAX),
-                TerminalFilter::Lzma2 { options } => u64::from(lzma_rust2::lzma2_get_memory_usage(
-                    options.lzma_options.dict_size,
-                )),
+            let terminal_usage = match chain.terminal {
+                TerminalFilter::Lzma1 { options, .. } => {
+                    lz::decoder_memusage(options.dict_size).saturating_add(LZMA1_DECODER_OVERHEAD)
+                }
+                TerminalFilter::Lzma2 { options, .. } => {
+                    lz::decoder_memusage(options.lzma_options.dict_size)
+                        .saturating_add(LZMA2_DECODER_OVERHEAD)
+                }
             };
 
-            if terminal_usage_kib == u64::MAX {
+            if terminal_usage == u64::MAX {
                 u64::MAX
             } else {
-                terminal_usage_kib
-                    .saturating_mul(1024)
+                terminal_usage
                     .saturating_add(prefilter_usage)
                     .saturating_add(LZMA_MEMUSAGE_BASE)
             }

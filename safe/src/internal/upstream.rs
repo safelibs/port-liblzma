@@ -8,19 +8,20 @@ use std::{
 };
 
 use crate::ffi::types::{
-    lzma_action, lzma_allocator, lzma_block, lzma_check, lzma_filter, lzma_mt,
-    lzma_options_lzma, lzma_ret, lzma_stream, LZMA_BUF_ERROR, LZMA_GET_CHECK, LZMA_NO_CHECK,
-    LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
-    LZMA_VLI_UNKNOWN,
+    lzma_action, lzma_allocator, lzma_block, lzma_check, lzma_filter, lzma_mt, lzma_options_lzma,
+    lzma_ret, lzma_stream, LZMA_BUF_ERROR, LZMA_GET_CHECK, LZMA_NO_CHECK, LZMA_OK,
+    LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK, LZMA_VLI_UNKNOWN,
 };
 use crate::internal::block;
-use crate::internal::check;
+use crate::internal::check::{self, CheckState};
 use crate::internal::common::{
     all_supported_actions, ACTION_COUNT, LZMA_FINISH, LZMA_PRESET_LEVEL_MASK, LZMA_RUN,
     LZMA_SYNC_FLUSH,
 };
 use crate::internal::filter;
-use crate::internal::lzma::{self, ParsedFilterChain, Prefilter, TerminalFilter, LZMA_MEMUSAGE_BASE};
+use crate::internal::lzma::{
+    self, ParsedFilterChain, Prefilter, TerminalFilter, LZMA_MEMUSAGE_BASE,
+};
 use crate::internal::preset;
 use crate::internal::stream_state::{current_next_coder, install_next_coder, NextCoder};
 use crate::internal::vli::lzma_vli_encode_impl;
@@ -144,7 +145,11 @@ unsafe fn copy_output(
     out_size: usize,
 ) -> lzma_ret {
     let copy_size = (buffer.len() - *state_pos).min(out_size - *out_pos);
-    ptr::copy_nonoverlapping(buffer.as_ptr().add(*state_pos), output.add(*out_pos), copy_size);
+    ptr::copy_nonoverlapping(
+        buffer.as_ptr().add(*state_pos),
+        output.add(*out_pos),
+        copy_size,
+    );
     *state_pos += copy_size;
     *out_pos += copy_size;
     if *state_pos == buffer.len() {
@@ -159,12 +164,7 @@ trait FinishableWrite: Write {
 }
 
 impl SharedSink {
-    fn copy_available(
-        &self,
-        output: *mut u8,
-        out_pos: *mut usize,
-        out_size: usize,
-    ) -> usize {
+    fn copy_available(&self, output: *mut u8, out_pos: *mut usize, out_size: usize) -> usize {
         let mut state = self.0.borrow_mut();
         let available = state.data.len().saturating_sub(state.read_pos);
         let copy_size = available.min(out_size - unsafe { *out_pos });
@@ -385,27 +385,27 @@ fn wrap_bcj_reader(
     inner: Box<dyn Read>,
 ) -> Box<dyn Read> {
     match kind {
-        crate::internal::simple::SimpleFilterKind::X86 => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_x86(inner, start_offset as usize))
-        }
-        crate::internal::simple::SimpleFilterKind::PowerPc => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_ppc(inner, start_offset as usize))
-        }
-        crate::internal::simple::SimpleFilterKind::Ia64 => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_ia64(inner, start_offset as usize))
-        }
-        crate::internal::simple::SimpleFilterKind::Arm => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_arm(inner, start_offset as usize))
-        }
+        crate::internal::simple::SimpleFilterKind::X86 => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_x86(inner, start_offset as usize),
+        ),
+        crate::internal::simple::SimpleFilterKind::PowerPc => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_ppc(inner, start_offset as usize),
+        ),
+        crate::internal::simple::SimpleFilterKind::Ia64 => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_ia64(inner, start_offset as usize),
+        ),
+        crate::internal::simple::SimpleFilterKind::Arm => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_arm(inner, start_offset as usize),
+        ),
         crate::internal::simple::SimpleFilterKind::ArmThumb => Box::new(
             lzma_rust2::filter::bcj::BcjReader::new_arm_thumb(inner, start_offset as usize),
         ),
-        crate::internal::simple::SimpleFilterKind::Arm64 => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_arm64(inner, start_offset as usize))
-        }
-        crate::internal::simple::SimpleFilterKind::Sparc => {
-            Box::new(lzma_rust2::filter::bcj::BcjReader::new_sparc(inner, start_offset as usize))
-        }
+        crate::internal::simple::SimpleFilterKind::Arm64 => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_arm64(inner, start_offset as usize),
+        ),
+        crate::internal::simple::SimpleFilterKind::Sparc => Box::new(
+            lzma_rust2::filter::bcj::BcjReader::new_sparc(inner, start_offset as usize),
+        ),
     }
 }
 
@@ -424,7 +424,7 @@ fn build_raw_encoder(
                     .map_err(|error| lzma::io_error_to_ret(&error))?,
             ),
         }),
-        TerminalFilter::Lzma2 { options } => Box::new(TerminalLzma2Writer {
+        TerminalFilter::Lzma2 { options, .. } => Box::new(TerminalLzma2Writer {
             writer: Some(lzma_rust2::Lzma2Writer::new(sink.clone(), options.clone())),
         }),
     };
@@ -433,12 +433,11 @@ fn build_raw_encoder(
     for filter in chain.prefilters.iter().rev() {
         writer = match *filter {
             Prefilter::Delta { distance } => Box::new(DeltaWriterWrapper {
-                writer: Some(lzma_rust2::filter::delta::DeltaWriter::new(writer, distance)),
+                writer: Some(lzma_rust2::filter::delta::DeltaWriter::new(
+                    writer, distance,
+                )),
             }),
-            Prefilter::Simple {
-                kind,
-                start_offset,
-            } => {
+            Prefilter::Simple { kind, start_offset } => {
                 supports_sync_flush = false;
                 wrap_bcj_writer(kind, start_offset, writer)
             }
@@ -448,7 +447,10 @@ fn build_raw_encoder(
     Ok((writer, supports_sync_flush))
 }
 
-fn build_raw_decoder(chain: &ParsedFilterChain, source: SharedSource) -> Result<Box<dyn Read>, lzma_ret> {
+fn build_raw_decoder(
+    chain: &ParsedFilterChain,
+    source: SharedSource,
+) -> Result<Box<dyn Read>, lzma_ret> {
     let mut reader: Box<dyn Read> = match &chain.terminal {
         TerminalFilter::Lzma1 {
             options,
@@ -466,7 +468,7 @@ fn build_raw_decoder(chain: &ParsedFilterChain, source: SharedSource) -> Result<
             )
             .map_err(|error| lzma::io_error_to_ret(&error))?,
         ),
-        TerminalFilter::Lzma2 { options } => Box::new(lzma_rust2::Lzma2Reader::new(
+        TerminalFilter::Lzma2 { options, .. } => Box::new(lzma_rust2::Lzma2Reader::new(
             source.clone(),
             options.lzma_options.dict_size,
             options.lzma_options.preset_dict.as_deref(),
@@ -475,13 +477,10 @@ fn build_raw_decoder(chain: &ParsedFilterChain, source: SharedSource) -> Result<
 
     for filter in chain.prefilters.iter().rev() {
         reader = match *filter {
-            Prefilter::Delta { distance } => {
-                Box::new(lzma_rust2::filter::delta::DeltaReader::new(reader, distance))
-            }
-            Prefilter::Simple {
-                kind,
-                start_offset,
-            } => wrap_bcj_reader(kind, start_offset, reader),
+            Prefilter::Delta { distance } => Box::new(lzma_rust2::filter::delta::DeltaReader::new(
+                reader, distance,
+            )),
+            Prefilter::Simple { kind, start_offset } => wrap_bcj_reader(kind, start_offset, reader),
         };
     }
 
@@ -592,10 +591,6 @@ fn parse_index_records(input: &[u8]) -> Result<Vec<IndexRecord>, lzma_ret> {
 
     let mut pos = 1usize;
     let record_count = decode_vli(&input[..payload_len], &mut pos)?;
-    if record_count == 0 {
-        return Err(crate::ffi::types::LZMA_DATA_ERROR);
-    }
-
     let mut records = Vec::with_capacity(record_count as usize);
     for _ in 0..record_count {
         let unpadded_size = decode_vli(&input[..payload_len], &mut pos)?;
@@ -616,7 +611,163 @@ fn parse_index_records(input: &[u8]) -> Result<Vec<IndexRecord>, lzma_ret> {
     Ok(records)
 }
 
-fn decode_single_xz_stream_fallback(input: &[u8], ignore_check: bool) -> Result<(usize, Vec<u8>), lzma_ret> {
+fn decode_lzma2_uncompressed_chunks_for_xz(
+    input: &[u8],
+    mut need_dict_reset: bool,
+) -> Result<Vec<u8>, lzma_ret> {
+    let mut pos = 0usize;
+    let mut output = Vec::new();
+
+    while pos < input.len() {
+        let control = input[pos];
+        pos += 1;
+
+        if control == 0x00 {
+            if pos != input.len() {
+                return Err(crate::ffi::types::LZMA_DATA_ERROR);
+            }
+            return Ok(output);
+        }
+
+        match control {
+            0x01 => need_dict_reset = false,
+            0x02 => {
+                if need_dict_reset {
+                    return Err(crate::ffi::types::LZMA_DATA_ERROR);
+                }
+            }
+            _ => return Err(crate::ffi::types::LZMA_DATA_ERROR),
+        }
+
+        if input.len() - pos < 2 {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        let copy_size = (((input[pos] as usize) << 8) | input[pos + 1] as usize) + 1;
+        pos += 2;
+
+        if input.len() - pos < copy_size {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        output.extend_from_slice(&input[pos..pos + copy_size]);
+        pos += copy_size;
+    }
+
+    Err(crate::ffi::types::LZMA_DATA_ERROR)
+}
+
+unsafe fn decode_validated_xz_block(
+    input: &[u8],
+    block_start: usize,
+    index_start: usize,
+    check_id: lzma_check,
+    record: IndexRecord,
+    ignore_check: bool,
+) -> Result<(usize, Vec<u8>, u64), lzma_ret> {
+    let mut decoded_filters = [lzma_filter {
+        id: LZMA_VLI_UNKNOWN,
+        options: ptr::null_mut(),
+    }; crate::ffi::types::LZMA_FILTERS_MAX + 1];
+
+    let result = (|| {
+        let mut block_options: lzma_block = mem::zeroed();
+        block_options.version = 1;
+        block_options.check = check_id;
+        block_options.header_size = ((input[block_start] as u32) + 1) * 4;
+        block_options.filters = decoded_filters.as_mut_ptr();
+
+        let ret = block::block_header_decode(
+            &mut block_options,
+            ptr::null(),
+            input.as_ptr().add(block_start),
+        );
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        if block_options.uncompressed_size != LZMA_VLI_UNKNOWN
+            && block_options.uncompressed_size != record.uncompressed_size
+        {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+        block_options.uncompressed_size = record.uncompressed_size;
+
+        let memusage = lzma::decoder_memusage(decoded_filters.as_ptr());
+        if memusage == u64::MAX {
+            return Err(LZMA_OPTIONS_ERROR);
+        }
+
+        let ret = block::block_compressed_size(&mut block_options, record.unpadded_size);
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        let compressed_size = block_options.compressed_size as usize;
+        let check_size = check::check_size(block_options.check) as usize;
+        let block_end = block_start + block::block_total_size(&block_options) as usize;
+        let data_start = block_start + block_options.header_size as usize;
+        let check_start = block_end.saturating_sub(check_size);
+        if block_end > index_start || data_start + compressed_size > check_start {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        let chain = lzma::parse_filters(decoded_filters.as_ptr())?;
+        let compressed = &input[data_start..data_start + compressed_size];
+        let (decoded, consumed) = match lzma::decode_raw(&chain, compressed) {
+            Ok((decoded, consumed)) => (decoded, consumed),
+            Err(ret) => {
+                if chain.prefilters.is_empty()
+                    && matches!(chain.terminal, TerminalFilter::Lzma2 { .. })
+                {
+                    let need_dict_reset = match &chain.terminal {
+                        TerminalFilter::Lzma2 { options, .. } => {
+                            options.lzma_options.preset_dict.is_none()
+                        }
+                        _ => true,
+                    };
+                    match decode_lzma2_uncompressed_chunks_for_xz(compressed, need_dict_reset) {
+                        Ok(decoded) => (decoded, compressed.len()),
+                        Err(_) => return Err(ret),
+                    }
+                } else {
+                    return Err(ret);
+                }
+            }
+        };
+
+        if consumed != compressed_size || decoded.len() as u64 != record.uncompressed_size {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        if !ignore_check && check::check_is_supported(block_options.check) != 0 {
+            let mut state = CheckState::new(block_options.check).ok_or(LZMA_OPTIONS_ERROR)?;
+            state.update(&decoded);
+            let expected_check = &input[check_start..block_end];
+            if state.finish()[..check_size] != expected_check[..check_size] {
+                return Err(crate::ffi::types::LZMA_DATA_ERROR);
+            }
+        }
+
+        let padding_start = data_start + compressed_size;
+        if input[padding_start..check_start]
+            .iter()
+            .any(|byte| *byte != 0)
+        {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        Ok((block_end, decoded, memusage))
+    })();
+
+    filter::filters_free_impl(decoded_filters.as_mut_ptr(), ptr::null());
+    result
+}
+
+fn decode_single_xz_stream_fallback(
+    input: &[u8],
+    ignore_check: bool,
+) -> Result<(usize, Vec<u8>), lzma_ret> {
     use crate::ffi::types::lzma_stream_flags;
     use crate::internal::stream_flags::{
         stream_flags_compare_impl, stream_footer_decode_impl, stream_header_decode_impl,
@@ -657,71 +808,26 @@ fn decode_single_xz_stream_fallback(input: &[u8], ignore_check: bool) -> Result<
 
     let index_start = input.len() - LZMA_STREAM_HEADER_SIZE - index_size;
     let records = parse_index_records(&input[index_start..input.len() - LZMA_STREAM_HEADER_SIZE])?;
-    let total_output = records
-        .iter()
-        .try_fold(0usize, |acc, record| {
-            acc.checked_add(record.uncompressed_size as usize)
-                .ok_or(crate::ffi::types::LZMA_DATA_ERROR)
-        })?;
+    let total_output = records.iter().try_fold(0usize, |acc, record| {
+        acc.checked_add(record.uncompressed_size as usize)
+            .ok_or(crate::ffi::types::LZMA_DATA_ERROR)
+    })?;
 
-    let mut output = vec![0u8; total_output];
+    let mut output = Vec::with_capacity(total_output);
     let mut block_start = LZMA_STREAM_HEADER_SIZE;
-    let mut out_pos = 0usize;
 
     for record in records {
-        let mut decoded_filters = [lzma_filter {
-            id: LZMA_VLI_UNKNOWN,
-            options: ptr::null_mut(),
-        }; crate::ffi::types::LZMA_FILTERS_MAX + 1];
-        let mut block_options: lzma_block = unsafe { mem::zeroed() };
-        block_options.version = 1;
-        block_options.check = header_flags.check;
-        block_options.header_size = ((input[block_start] as u32) + 1) * 4;
-        block_options.filters = decoded_filters.as_mut_ptr();
-
-        unsafe {
-            let ret = block::block_header_decode(
-                &mut block_options,
-                ptr::null(),
-                input.as_ptr().add(block_start),
-            );
-            if ret != LZMA_OK {
-                return Err(ret);
-            }
-
-            let ret = block::block_compressed_size(&mut block_options, record.unpadded_size);
-            if ret != LZMA_OK {
-                return Err(ret);
-            }
-        }
-        block_options.ignore_check = if ignore_check || check::check_is_supported(header_flags.check) == 0 {
-            1
-        } else {
-            0
-        };
-
-        let mut in_pos = block_start + block_options.header_size as usize;
-        let block_end = block_start + unsafe { block::block_total_size(&block_options) as usize };
-        let ret = unsafe {
-            block::block_buffer_decode(
-                &mut block_options,
-                ptr::null(),
-                input.as_ptr(),
-                &mut in_pos,
+        let (block_end, decoded, _) = unsafe {
+            decode_validated_xz_block(
+                input,
+                block_start,
                 index_start,
-                output.as_mut_ptr(),
-                &mut out_pos,
-                output.len(),
+                header_flags.check,
+                record,
+                ignore_check || check::check_is_supported(header_flags.check) == 0,
             )
-        };
-        if ret != LZMA_OK || in_pos != block_end {
-            return Err(if ret == LZMA_OK {
-                crate::ffi::types::LZMA_DATA_ERROR
-            } else {
-                ret
-            });
-        }
-
+        }?;
+        output.extend_from_slice(&decoded);
         block_start = block_end;
     }
 
@@ -794,41 +900,17 @@ fn inspect_single_xz_stream(input: &[u8]) -> Result<(lzma_check, u64), lzma_ret>
     let mut max_memusage = LZMA_MEMUSAGE_BASE;
 
     for record in records {
-        let mut decoded_filters = [lzma_filter {
-            id: LZMA_VLI_UNKNOWN,
-            options: ptr::null_mut(),
-        }; crate::ffi::types::LZMA_FILTERS_MAX + 1];
-        let mut block_options: lzma_block = unsafe { mem::zeroed() };
-        block_options.version = 1;
-        block_options.check = header_flags.check;
-        block_options.header_size = ((input[block_start] as u32) + 1) * 4;
-        block_options.filters = decoded_filters.as_mut_ptr();
-
-        let ret = unsafe {
-            block::block_header_decode(&mut block_options, ptr::null(), input.as_ptr().add(block_start))
-        };
-        if ret != LZMA_OK {
-            return Err(ret);
-        }
-
-        let memusage = unsafe { lzma::decoder_memusage(decoded_filters.as_ptr()) };
-        unsafe {
-            filter::filters_free_impl(decoded_filters.as_mut_ptr(), ptr::null());
-        }
-        if memusage == u64::MAX {
-            return Err(LZMA_OPTIONS_ERROR);
-        }
+        let (block_end, _decoded, memusage) = unsafe {
+            decode_validated_xz_block(
+                input,
+                block_start,
+                index_start,
+                header_flags.check,
+                record,
+                check::check_is_supported(header_flags.check) == 0,
+            )
+        }?;
         max_memusage = max_memusage.max(memusage);
-
-        let ret = unsafe { block::block_compressed_size(&mut block_options, record.unpadded_size) };
-        if ret != LZMA_OK {
-            return Err(ret);
-        }
-
-        let block_end = block_start + unsafe { block::block_total_size(&block_options) as usize };
-        if block_end > index_start {
-            return Err(crate::ffi::types::LZMA_DATA_ERROR);
-        }
         block_start = block_end;
     }
 
@@ -839,6 +921,24 @@ fn inspect_single_xz_stream(input: &[u8]) -> Result<(lzma_check, u64), lzma_ret>
     Ok((header_flags.check, max_memusage))
 }
 
+fn find_single_xz_stream_end(input: &[u8]) -> Result<usize, lzma_ret> {
+    if input.len() < crate::internal::stream_flags::LZMA_STREAM_HEADER_SIZE * 2 {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
+    }
+
+    for end in crate::internal::stream_flags::LZMA_STREAM_HEADER_SIZE * 2..=input.len() {
+        if input[end - 2..end] != *b"YZ" {
+            continue;
+        }
+
+        if inspect_single_xz_stream(&input[..end]).is_ok() {
+            return Ok(end);
+        }
+    }
+
+    Err(crate::ffi::types::LZMA_DATA_ERROR)
+}
+
 fn inspect_xz_stream(input: &[u8], concatenated: bool) -> Result<(lzma_check, u64), lzma_ret> {
     if !concatenated {
         return inspect_single_xz_stream(input);
@@ -847,22 +947,36 @@ fn inspect_xz_stream(input: &[u8], concatenated: bool) -> Result<(lzma_check, u6
     let mut offset = 0usize;
     let mut max_memusage = LZMA_MEMUSAGE_BASE;
     let mut first_check = crate::ffi::types::LZMA_CHECK_NONE;
+    let mut saw_stream = false;
+    let mut padding = 0usize;
 
     while offset < input.len() {
         while offset < input.len() && input[offset] == 0 {
             offset += 1;
+            padding = (padding + 1) & 3;
         }
 
         if offset == input.len() {
             break;
         }
 
-        let (check, memusage) = inspect_single_xz_stream(&input[offset..])?;
+        if saw_stream && padding != 0 {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        let stream_len = find_single_xz_stream_end(&input[offset..])?;
+        let (check, memusage) = inspect_single_xz_stream(&input[offset..offset + stream_len])?;
         if first_check == crate::ffi::types::LZMA_CHECK_NONE {
             first_check = check;
         }
         max_memusage = max_memusage.max(memusage);
-        offset = input.len();
+        offset += stream_len;
+        saw_stream = true;
+        padding = 0;
+    }
+
+    if saw_stream && padding != 0 {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
     }
 
     Ok((first_check, max_memusage))
@@ -907,7 +1021,11 @@ unsafe fn encode_block_with_filters(
     Ok((encoded, record))
 }
 
-fn decode_xz_stream_once(input: &[u8], concatenated: bool, ignore_check: bool) -> Result<(usize, Vec<u8>), lzma_ret> {
+fn decode_xz_stream_once(
+    input: &[u8],
+    concatenated: bool,
+    ignore_check: bool,
+) -> Result<(usize, Vec<u8>), lzma_ret> {
     let cursor = Cursor::new(input);
     let mut reader = lzma_rust2::XzReader::new(cursor, concatenated);
     let mut output = Vec::new();
@@ -916,14 +1034,53 @@ fn decode_xz_stream_once(input: &[u8], concatenated: bool, ignore_check: bool) -
             let cursor = reader.into_inner();
             Ok((cursor.position() as usize, output))
         }
-        Err(error) => {
-            if !concatenated {
-                decode_single_xz_stream_fallback(input, ignore_check)
-            } else {
-                Err(lzma::io_error_to_ret(&error))
-            }
-        }
+        Err(_) => decode_xz_stream_fallback(input, concatenated, ignore_check),
     }
+}
+
+fn decode_xz_stream_fallback(
+    input: &[u8],
+    concatenated: bool,
+    ignore_check: bool,
+) -> Result<(usize, Vec<u8>), lzma_ret> {
+    if !concatenated {
+        return decode_single_xz_stream_fallback(input, ignore_check);
+    }
+
+    let mut offset = 0usize;
+    let mut output = Vec::new();
+    let mut saw_stream = false;
+    let mut padding = 0usize;
+
+    while offset < input.len() {
+        while offset < input.len() && input[offset] == 0 {
+            offset += 1;
+            padding = (padding + 1) & 3;
+        }
+
+        if offset == input.len() {
+            break;
+        }
+
+        if saw_stream && padding != 0 {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+
+        let stream_len = find_single_xz_stream_end(&input[offset..])?;
+        let (consumed, decoded) =
+            decode_single_xz_stream_fallback(&input[offset..offset + stream_len], ignore_check)?;
+        debug_assert_eq!(consumed, stream_len);
+        output.extend_from_slice(&decoded);
+        offset += stream_len;
+        saw_stream = true;
+        padding = 0;
+    }
+
+    if saw_stream && padding != 0 {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
+    }
+
+    Ok((offset, output))
 }
 
 unsafe fn raw_code(
@@ -942,7 +1099,9 @@ unsafe fn raw_code(
         RawCoderState::Encoder(state) => {
             let copied = state.sink.copy_available(output, out_pos, out_size);
             if copied != 0 {
-                if state.pending_stream_end && state.sink.copy_available(output, out_pos, out_size) == 0 {
+                if state.pending_stream_end
+                    && state.sink.copy_available(output, out_pos, out_size) == 0
+                {
                     if !state.finished {
                         state.pending_stream_end = false;
                     }
@@ -1001,7 +1160,13 @@ unsafe fn raw_code(
         }
         RawCoderState::Decoder(state) => {
             if state.pending_pos < state.pending.len() {
-                let ret = copy_output(&state.pending, &mut state.pending_pos, output, out_pos, out_size);
+                let ret = copy_output(
+                    &state.pending,
+                    &mut state.pending_pos,
+                    output,
+                    out_pos,
+                    out_size,
+                );
                 if state.pending_pos == state.pending.len() {
                     state.pending.clear();
                     state.pending_pos = 0;
@@ -1036,8 +1201,12 @@ unsafe fn raw_code(
             }
 
             let target = (out_size - *out_pos).max(1);
-            while state.pending.len().saturating_sub(state.pending_pos) < target && !state.stream_finished {
-                let read_len = (target - state.pending.len().saturating_sub(state.pending_pos)).max(1).min(8192);
+            while state.pending.len().saturating_sub(state.pending_pos) < target
+                && !state.stream_finished
+            {
+                let read_len = (target - state.pending.len().saturating_sub(state.pending_pos))
+                    .max(1)
+                    .min(8192);
                 let mut temp = vec![0u8; read_len];
                 match state.reader.read(&mut temp) {
                     Ok(0) => {
@@ -1065,7 +1234,13 @@ unsafe fn raw_code(
             }
 
             if state.pending_pos < state.pending.len() {
-                let ret = copy_output(&state.pending, &mut state.pending_pos, output, out_pos, out_size);
+                let ret = copy_output(
+                    &state.pending,
+                    &mut state.pending_pos,
+                    output,
+                    out_pos,
+                    out_size,
+                );
                 if state.pending_pos == state.pending.len() {
                     state.pending.clear();
                     state.pending_pos = 0;
@@ -1102,7 +1277,13 @@ unsafe fn stream_encoder_code(
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<StreamEncoderCoder>();
     if coder.pending_pos < coder.pending.len() {
-        return copy_output(&coder.pending, &mut coder.pending_pos, output, out_pos, out_size);
+        return copy_output(
+            &coder.pending,
+            &mut coder.pending_pos,
+            output,
+            out_pos,
+            out_size,
+        );
     }
     if !coder.pending.is_empty() {
         coder.pending.clear();
@@ -1110,7 +1291,9 @@ unsafe fn stream_encoder_code(
     }
 
     if in_size != 0 {
-        coder.input.extend_from_slice(core::slice::from_raw_parts(input, in_size));
+        coder
+            .input
+            .extend_from_slice(core::slice::from_raw_parts(input, in_size));
         *in_pos = in_size;
     }
 
@@ -1128,7 +1311,11 @@ unsafe fn stream_encoder_code(
                 write_xz_stream_header(coder.check, &mut coder.pending);
                 coder.header_written = true;
             }
-            let (encoded, record) = match encode_block_with_filters(coder.filters.as_mut_ptr(), coder.check, &coder.input) {
+            let (encoded, record) = match encode_block_with_filters(
+                coder.filters.as_mut_ptr(),
+                coder.check,
+                &coder.input,
+            ) {
                 Ok(result) => result,
                 Err(ret) => return ret,
             };
@@ -1136,7 +1323,13 @@ unsafe fn stream_encoder_code(
             coder.pending.extend_from_slice(&encoded);
             coder.pending_pos = 0;
             coder.input.clear();
-            copy_output(&coder.pending, &mut coder.pending_pos, output, out_pos, out_size)
+            copy_output(
+                &coder.pending,
+                &mut coder.pending_pos,
+                output,
+                out_pos,
+                out_size,
+            )
         }
         crate::internal::common::LZMA_FINISH => {
             if !coder.header_written {
@@ -1144,11 +1337,14 @@ unsafe fn stream_encoder_code(
                 coder.header_written = true;
             }
             if !coder.input.is_empty() {
-                let (encoded, record) =
-                    match encode_block_with_filters(coder.filters.as_mut_ptr(), coder.check, &coder.input) {
-                        Ok(result) => result,
-                        Err(ret) => return ret,
-                    };
+                let (encoded, record) = match encode_block_with_filters(
+                    coder.filters.as_mut_ptr(),
+                    coder.check,
+                    &coder.input,
+                ) {
+                    Ok(result) => result,
+                    Err(ret) => return ret,
+                };
                 coder.records.push(record);
                 coder.pending.extend_from_slice(&encoded);
                 coder.input.clear();
@@ -1160,7 +1356,13 @@ unsafe fn stream_encoder_code(
             write_xz_stream_footer(coder.check, backward_size, &mut coder.pending);
             coder.pending_pos = 0;
             coder.finished = true;
-            copy_output(&coder.pending, &mut coder.pending_pos, output, out_pos, out_size)
+            copy_output(
+                &coder.pending,
+                &mut coder.pending_pos,
+                output,
+                out_pos,
+                out_size,
+            )
         }
         _ => LZMA_PROG_ERROR,
     }
@@ -1192,11 +1394,19 @@ unsafe fn stream_decoder_code(
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<StreamDecoderCoder>();
     if coder.output_pos < coder.output.len() {
-        return copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size);
+        return copy_output(
+            &coder.output,
+            &mut coder.output_pos,
+            output,
+            out_pos,
+            out_size,
+        );
     }
 
     if in_size != 0 {
-        coder.input.extend_from_slice(core::slice::from_raw_parts(input, in_size));
+        coder
+            .input
+            .extend_from_slice(core::slice::from_raw_parts(input, in_size));
         *in_pos = in_size;
     }
 
@@ -1231,7 +1441,9 @@ unsafe fn stream_decoder_code(
                 };
             }
             Err(ret) => {
-                return if action == crate::internal::common::LZMA_FINISH && ret == crate::ffi::types::LZMA_DATA_ERROR {
+                return if action == crate::internal::common::LZMA_FINISH
+                    && ret == crate::ffi::types::LZMA_DATA_ERROR
+                {
                     LZMA_BUF_ERROR
                 } else if action == crate::internal::common::LZMA_FINISH {
                     ret
@@ -1248,10 +1460,23 @@ unsafe fn stream_decoder_code(
         return ret;
     }
 
-    if coder.memusage == LZMA_MEMUSAGE_BASE || (coder.flags & LZMA_CONCATENATED) != 0 {
-        if let Ok((check_id, memusage)) = inspect_xz_stream(&coder.input, (coder.flags & LZMA_CONCATENATED) != 0) {
-            coder.check = check_id;
-            coder.memusage = memusage.max(LZMA_MEMUSAGE_BASE);
+    let concatenated = (coder.flags & LZMA_CONCATENATED) != 0;
+    if coder.memusage == LZMA_MEMUSAGE_BASE
+        || concatenated
+        || action == crate::internal::common::LZMA_FINISH
+    {
+        match inspect_xz_stream(&coder.input, concatenated) {
+            Ok((check_id, memusage)) => {
+                coder.check = check_id;
+                coder.memusage = memusage.max(LZMA_MEMUSAGE_BASE);
+            }
+            Err(ret) => {
+                return if action == crate::internal::common::LZMA_FINISH {
+                    ret
+                } else {
+                    LZMA_OK
+                };
+            }
         }
     }
 
@@ -1268,7 +1493,13 @@ unsafe fn stream_decoder_code(
             coder.output = decoded;
             coder.output_pos = 0;
             coder.decoded = true;
-            copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size)
+            copy_output(
+                &coder.output,
+                &mut coder.output_pos,
+                output,
+                out_pos,
+                out_size,
+            )
         }
         Err(ret) => {
             if action == crate::internal::common::LZMA_FINISH {
@@ -1646,7 +1877,10 @@ pub(crate) unsafe fn stream_decoder(strm: *mut lzma_stream, memlimit: u64, flags
     )
 }
 
-pub(crate) unsafe fn filters_update(strm: *mut lzma_stream, filters: *const lzma_filter) -> lzma_ret {
+pub(crate) unsafe fn filters_update(
+    strm: *mut lzma_stream,
+    filters: *const lzma_filter,
+) -> lzma_ret {
     let Some(next) = current_next_coder(strm) else {
         return LZMA_PROG_ERROR;
     };
@@ -1654,7 +1888,11 @@ pub(crate) unsafe fn filters_update(strm: *mut lzma_stream, filters: *const lzma
         return LZMA_PROG_ERROR;
     }
     let coder = &mut *next.coder.cast::<StreamEncoderCoder>();
-    if coder.magic != STREAM_ENCODER_MAGIC || !coder.input.is_empty() || coder.pending_pos < coder.pending.len() || coder.finished {
+    if coder.magic != STREAM_ENCODER_MAGIC
+        || !coder.input.is_empty()
+        || coder.pending_pos < coder.pending.len()
+        || coder.finished
+    {
         return LZMA_PROG_ERROR;
     }
 
@@ -1667,7 +1905,11 @@ pub(crate) unsafe fn filters_update(strm: *mut lzma_stream, filters: *const lzma
     LZMA_OK
 }
 
-pub(crate) unsafe fn easy_encoder(strm: *mut lzma_stream, preset_id: u32, check_id: lzma_check) -> lzma_ret {
+pub(crate) unsafe fn easy_encoder(
+    strm: *mut lzma_stream,
+    preset_id: u32,
+    check_id: lzma_check,
+) -> lzma_ret {
     let mut options: lzma_options_lzma = mem::zeroed();
     if preset::lzma_lzma_preset_impl(&mut options, preset_id) != 0 {
         return LZMA_OPTIONS_ERROR;
@@ -1709,7 +1951,16 @@ pub(crate) unsafe fn easy_buffer_encode(
             options: ptr::null_mut(),
         },
     ];
-    stream_buffer_encode(filters.as_mut_ptr(), check_id, allocator, input, input_size, output, output_pos, output_size)
+    stream_buffer_encode(
+        filters.as_mut_ptr(),
+        check_id,
+        allocator,
+        input,
+        input_size,
+        output,
+        output_pos,
+        output_size,
+    )
 }
 
 pub(crate) unsafe fn easy_encoder_memusage(preset_id: u32) -> u64 {
@@ -1752,7 +2003,10 @@ pub(crate) unsafe fn auto_decoder(strm: *mut lzma_stream, memlimit: u64, flags: 
     stream_decoder(strm, memlimit, flags)
 }
 
-pub(crate) unsafe fn stream_decoder_mt(strm: *mut lzma_stream, options: *const lzma_mt) -> lzma_ret {
+pub(crate) unsafe fn stream_decoder_mt(
+    strm: *mut lzma_stream,
+    options: *const lzma_mt,
+) -> lzma_ret {
     if strm.is_null() || options.is_null() {
         return LZMA_PROG_ERROR;
     }
@@ -1773,8 +2027,9 @@ mod tests {
     use core::{mem, ptr};
 
     use super::*;
-    use crate::ffi::types::{lzma_filter, lzma_options_lzma, LZMA_STREAM_INIT};
+    use crate::ffi::types::{lzma_filter, lzma_mt, lzma_options_lzma, LZMA_STREAM_INIT};
     use crate::internal::{
+        common::LZMA_CHECK_CRC32,
         filter::common::LZMA_FILTER_LZMA2,
         stream_state::{lzma_code_impl, lzma_end_impl},
     };
@@ -1877,5 +2132,129 @@ mod tests {
             assert_eq!(decoded, [part1, part2].concat());
             lzma_end_impl(&mut decode);
         }
+    }
+
+    #[test]
+    fn empty_xz_stream_with_zero_index_records_is_valid() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-0-empty.xz"
+        ));
+
+        let (check_id, memusage) = inspect_single_xz_stream(input).expect("inspect empty .xz");
+        assert_eq!(check_id, LZMA_CHECK_CRC32);
+        assert!(memusage >= LZMA_MEMUSAGE_BASE);
+
+        let (consumed, fallback_output) =
+            decode_single_xz_stream_fallback(input, false).expect("fallback decode empty .xz");
+        assert_eq!(consumed, input.len());
+        assert!(fallback_output.is_empty());
+
+        let (consumed, decoded) =
+            decode_xz_stream_once(input, false, false).expect("decode empty .xz");
+        assert_eq!(consumed, input.len());
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn stream_decoder_accepts_empty_xz_stream() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-0-empty.xz"
+        ));
+
+        unsafe {
+            let mut strm = LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder(&mut strm, u64::MAX, 0), LZMA_OK);
+
+            strm.next_in = input.as_ptr();
+            strm.avail_in = input.len();
+            let (ret, output) = pump(&mut strm, LZMA_FINISH, 32);
+            assert_eq!(ret, LZMA_STREAM_END);
+            assert!(output.is_empty());
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn inspect_rejects_bad_index_size_records() {
+        let bad_unpadded = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/bad-2-index-1.xz"
+        ));
+        let bad_uncompressed = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/bad-2-index-2.xz"
+        ));
+
+        assert_eq!(
+            inspect_single_xz_stream(bad_unpadded).unwrap_err(),
+            crate::ffi::types::LZMA_DATA_ERROR
+        );
+        assert_eq!(
+            inspect_single_xz_stream(bad_uncompressed).unwrap_err(),
+            crate::ffi::types::LZMA_DATA_ERROR
+        );
+    }
+
+    #[test]
+    fn three_delta_lzma2_stream_is_accepted() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/good-1-3delta-lzma2.xz"
+        ));
+
+        let (consumed, decoded) =
+            decode_xz_stream_once(input, false, false).expect("decode three-delta .xz");
+        assert_eq!(consumed, input.len());
+        assert!(!decoded.is_empty());
+
+        let (_check_id, memusage) =
+            inspect_single_xz_stream(input).expect("inspect three-delta .xz");
+        assert!(memusage >= LZMA_MEMUSAGE_BASE);
+    }
+
+    #[test]
+    fn mt_decoder_warns_then_decodes_unsupported_check_stream() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/unsupported-check.xz"
+        ));
+
+        unsafe {
+            let mut options: lzma_mt = mem::zeroed();
+            options.flags = LZMA_TELL_UNSUPPORTED_CHECK | LZMA_CONCATENATED;
+            options.memlimit_stop = u64::MAX;
+            options.memlimit_threading = 0;
+            options.threads = 2;
+
+            let mut strm = LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &options), LZMA_OK);
+
+            strm.next_in = input.as_ptr();
+            strm.avail_in = input.len();
+            strm.next_out = ptr::null_mut();
+            strm.avail_out = 0;
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_UNSUPPORTED_CHECK);
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_OK);
+
+            let mut output = [0u8; 64];
+            strm.next_out = output.as_mut_ptr();
+            strm.avail_out = output.len();
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_FINISH), LZMA_STREAM_END);
+            assert_eq!(strm.total_out, 13);
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn inspect_rejects_bad_lzma2_stream_without_initial_dict_reset() {
+        let input = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/upstream/files/bad-1-lzma2-1.xz"
+        ));
+
+        let ret = inspect_single_xz_stream(input).unwrap_err();
+        assert!(ret == crate::ffi::types::LZMA_DATA_ERROR || ret == LZMA_OPTIONS_ERROR);
     }
 }

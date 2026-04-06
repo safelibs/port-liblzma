@@ -601,4 +601,4 @@
    pointer, if such a type exists, and if the system does not define it. */
 /* #undef uintptr_t */
 
-/* Phase 05: low-level block/raw helpers and special container codecs are enabled. */
+/* Phase 06: single-threaded container APIs and the upstream helper harness are enabled. */

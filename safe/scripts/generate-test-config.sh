@@ -12,6 +12,6 @@ awk '
 { print }
 END {
   print ""
-  print "/* Phase 05: low-level block/raw helpers and special container codecs are enabled. */"
+  print "/* Phase 06: single-threaded container APIs and the upstream helper harness are enabled. */"
 }
 ' "$src" > "$dest"

@@ -33,7 +33,7 @@ pub(crate) fn decode_terminal(
             let consumed = reader.into_inner().position() as usize;
             Ok((out, consumed))
         }
-        TerminalFilter::Lzma2 { options } => {
+        TerminalFilter::Lzma2 { options, .. } => {
             let mut reader = lzma_rust2::Lzma2Reader::new(
                 Cursor::new(input),
                 options.lzma_options.dict_size,
@@ -49,13 +49,18 @@ pub(crate) fn decode_terminal(
     }
 }
 
-pub(crate) fn decode_raw(chain: &ParsedFilterChain, input: &[u8]) -> Result<(Vec<u8>, usize), lzma_ret> {
+pub(crate) fn decode_raw(
+    chain: &ParsedFilterChain,
+    input: &[u8],
+) -> Result<(Vec<u8>, usize), lzma_ret> {
     let (mut out, consumed) = decode_terminal(&chain.terminal, input)?;
 
     for filter in chain.prefilters.iter().rev() {
         out = match *filter {
             Prefilter::Delta { distance } => delta::decode_all(&out, distance),
-            Prefilter::Simple { kind, start_offset } => simple::decode_all(kind, start_offset, &out)?,
+            Prefilter::Simple { kind, start_offset } => {
+                simple::decode_all(kind, start_offset, &out)?
+            }
         };
     }
 

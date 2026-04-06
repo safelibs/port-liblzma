@@ -3,10 +3,12 @@ use core::ptr;
 
 use crate::ffi::types::{
     lzma_allocator, lzma_block, lzma_filter, lzma_options_lzma, lzma_ret, LZMA_BUF_ERROR,
-    LZMA_DATA_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
+    LZMA_DATA_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_UNSUPPORTED_CHECK,
     LZMA_VLI_UNKNOWN,
 };
-use crate::internal::block::header::{block_header_encode, block_header_size, block_total_size, block_unpadded_size};
+use crate::internal::block::header::{
+    block_header_encode, block_header_size, block_total_size, block_unpadded_size,
+};
 use crate::internal::check::{self, CheckState};
 use crate::internal::common::{LZMA_DICT_SIZE_MIN, LZMA_VLI_MAX};
 use crate::internal::filter::common::LZMA_FILTER_LZMA2;
@@ -33,8 +35,9 @@ fn lzma2_bound(uncompressed_size: u64) -> u64 {
         return 0;
     }
 
-    let overhead =
-        uncompressed_size.div_ceil(LZMA2_CHUNK_MAX as u64) * u64::from(LZMA2_HEADER_UNCOMPRESSED) + 1;
+    let overhead = uncompressed_size.div_ceil(LZMA2_CHUNK_MAX as u64)
+        * u64::from(LZMA2_HEADER_UNCOMPRESSED)
+        + 1;
     if COMPRESSED_SIZE_MAX - overhead < uncompressed_size {
         return 0;
     }
@@ -42,7 +45,10 @@ fn lzma2_bound(uncompressed_size: u64) -> u64 {
     uncompressed_size + overhead
 }
 
-fn decode_lzma2_uncompressed_chunks(input: &[u8]) -> Result<Vec<u8>, lzma_ret> {
+fn decode_lzma2_uncompressed_chunks(
+    input: &[u8],
+    mut need_dict_reset: bool,
+) -> Result<Vec<u8>, lzma_ret> {
     let mut pos = 0usize;
     let mut output = Vec::new();
 
@@ -57,8 +63,14 @@ fn decode_lzma2_uncompressed_chunks(input: &[u8]) -> Result<Vec<u8>, lzma_ret> {
             return Ok(output);
         }
 
-        if control != 0x01 && control != 0x02 {
-            return Err(LZMA_OPTIONS_ERROR);
+        match control {
+            0x01 => need_dict_reset = false,
+            0x02 => {
+                if need_dict_reset {
+                    return Err(LZMA_DATA_ERROR);
+                }
+            }
+            _ => return Err(LZMA_DATA_ERROR),
         }
 
         if input.len() - pos < 2 {
@@ -146,15 +158,18 @@ unsafe fn encode_normal_block(
     (*block).raw_check = state.finish();
 
     let check_size = check::check_size((*block).check) as usize;
+    let end = start + total_size as usize;
+    let check_start = end - check_size;
+    ptr::write_bytes(
+        output.add(data_start + raw.len()),
+        0,
+        check_start - (data_start + raw.len()),
+    );
     ptr::copy_nonoverlapping(
         (*block).raw_check.as_ptr(),
-        output.add(data_start + raw.len()),
+        output.add(check_start),
         check_size,
     );
-
-    let end = start + total_size as usize;
-    let unpadded = block_unpadded_size(block.cast_const()) as usize;
-    ptr::write_bytes(output.add(start + unpadded), 0, end - (start + unpadded));
     *output_pos = end;
 
     LZMA_OK
@@ -193,7 +208,10 @@ unsafe fn encode_uncompressed_block(
     }
 
     let total_size = block_total_size(block.cast_const());
-    if total_size == 0 || total_size == LZMA_VLI_UNKNOWN || output_size - *output_pos < total_size as usize {
+    if total_size == 0
+        || total_size == LZMA_VLI_UNKNOWN
+        || output_size - *output_pos < total_size as usize
+    {
         (*block).filters = original_filters;
         return LZMA_BUF_ERROR;
     }
@@ -240,11 +258,14 @@ unsafe fn encode_uncompressed_block(
     (*block).raw_check = state.finish();
 
     let check_size = check::check_size((*block).check) as usize;
-    ptr::copy_nonoverlapping((*block).raw_check.as_ptr(), output.add(*output_pos), check_size);
-    *output_pos += check_size;
-
     let end = start + total_size as usize;
-    ptr::write_bytes(output.add(*output_pos), 0, end - *output_pos);
+    let check_start = end - check_size;
+    ptr::write_bytes(output.add(*output_pos), 0, check_start - *output_pos);
+    ptr::copy_nonoverlapping(
+        (*block).raw_check.as_ptr(),
+        output.add(check_start),
+        check_size,
+    );
     *output_pos = end;
     LZMA_OK
 }
@@ -302,7 +323,15 @@ pub(crate) unsafe fn block_buffer_encode(
     output_pos: *mut usize,
     output_size: usize,
 ) -> lzma_ret {
-    block_buffer_encode_internal(block, input, input_size, output, output_pos, output_size, true)
+    block_buffer_encode_internal(
+        block,
+        input,
+        input_size,
+        output,
+        output_pos,
+        output_size,
+        true,
+    )
 }
 
 pub(crate) unsafe fn block_uncomp_encode(
@@ -313,7 +342,15 @@ pub(crate) unsafe fn block_uncomp_encode(
     output_pos: *mut usize,
     output_size: usize,
 ) -> lzma_ret {
-    block_buffer_encode_internal(block, input, input_size, output, output_pos, output_size, false)
+    block_buffer_encode_internal(
+        block,
+        input,
+        input_size,
+        output,
+        output_pos,
+        output_size,
+        false,
+    )
 }
 
 pub(crate) unsafe fn block_buffer_decode(
@@ -352,7 +389,8 @@ pub(crate) unsafe fn block_buffer_decode(
     }
 
     let end = in_start + total_size as usize - (*block).header_size as usize;
-    if end > input_size || in_start + compressed_size + check_size > input_size {
+    let check_start = end.saturating_sub(check_size);
+    if end > input_size || in_start + compressed_size > check_start {
         return LZMA_DATA_ERROR;
     }
 
@@ -362,14 +400,21 @@ pub(crate) unsafe fn block_buffer_decode(
     };
 
     let compressed = core::slice::from_raw_parts(input.add(in_start), compressed_size);
-    let decoded = match lzma::decode_raw(&chain, compressed) {
-        Ok((decoded, _consumed)) => decoded,
+    let expected_uncompressed_size = (*block).uncompressed_size;
+    let (decoded, consumed) = match lzma::decode_raw(&chain, compressed) {
+        Ok((decoded, consumed)) => (decoded, consumed),
         Err(ret) => {
             if chain.prefilters.is_empty()
                 && matches!(chain.terminal, lzma::TerminalFilter::Lzma2 { .. })
             {
-                match decode_lzma2_uncompressed_chunks(compressed) {
-                    Ok(decoded) => decoded,
+                let need_dict_reset = match &chain.terminal {
+                    lzma::TerminalFilter::Lzma2 { options, .. } => {
+                        options.lzma_options.preset_dict.is_none()
+                    }
+                    _ => true,
+                };
+                match decode_lzma2_uncompressed_chunks(compressed, need_dict_reset) {
+                    Ok(decoded) => (decoded, compressed.len()),
                     Err(_) => {
                         *input_pos = in_start;
                         *output_pos = out_start;
@@ -384,6 +429,15 @@ pub(crate) unsafe fn block_buffer_decode(
         }
     };
 
+    if consumed != compressed_size
+        || (expected_uncompressed_size != LZMA_VLI_UNKNOWN
+            && expected_uncompressed_size != decoded.len() as u64)
+    {
+        *input_pos = in_start;
+        *output_pos = out_start;
+        return LZMA_DATA_ERROR;
+    }
+
     if output_size - *output_pos < decoded.len() {
         *input_pos = in_start;
         *output_pos = out_start;
@@ -394,7 +448,7 @@ pub(crate) unsafe fn block_buffer_decode(
     *output_pos += decoded.len();
     (*block).uncompressed_size = decoded.len() as u64;
 
-    let check_ptr = input.add(in_start + compressed_size);
+    let check_ptr = input.add(check_start);
     ptr::copy_nonoverlapping(check_ptr, (*block).raw_check.as_mut_ptr(), check_size);
 
     let ignore_check = (*block).version >= 1 && (*block).ignore_check != 0;
@@ -416,8 +470,8 @@ pub(crate) unsafe fn block_buffer_decode(
         }
     }
 
-    let padding_start = in_start + compressed_size + check_size;
-    for i in padding_start..end {
+    let padding_start = in_start + compressed_size;
+    for i in padding_start..check_start {
         if *input.add(i) != 0 {
             *input_pos = in_start;
             *output_pos = out_start;

@@ -31,7 +31,7 @@ pub unsafe extern "C" fn lzma_auto_decoder(
     arg1: u64,
     arg2: u32,
 ) -> lzma_ret {
-    upstream::auto_decoder(arg0, arg1, arg2)
+    container::auto::auto_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -187,13 +187,13 @@ pub unsafe extern "C" fn lzma_easy_buffer_encode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    upstream::easy_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    container::easy::easy_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_easy_decoder_memusage(arg0: u32) -> u64 {
-    upstream::easy_decoder_memusage(arg0)
+    container::easy::easy_decoder_memusage(arg0)
 }
 
 #[no_mangle]
@@ -203,13 +203,13 @@ pub unsafe extern "C" fn lzma_easy_encoder(
     arg1: u32,
     arg2: lzma_check,
 ) -> lzma_ret {
-    upstream::easy_encoder(arg0, arg1, arg2)
+    container::easy::easy_encoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_easy_encoder_memusage(arg0: u32) -> u64 {
-    upstream::easy_encoder_memusage(arg0)
+    container::easy::easy_encoder_memusage(arg0)
 }
 
 #[no_mangle]
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn lzma_filters_update(
     arg0: *mut lzma_stream,
     arg1: *const lzma_filter,
 ) -> lzma_ret {
-    upstream::filters_update(arg0, arg1)
+    container::stream::filters_update(arg0, arg1)
 }
 
 #[no_mangle]
@@ -658,7 +658,7 @@ pub unsafe extern "C" fn lzma_raw_encoder_memusage(arg0: *const lzma_filter) -> 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_stream_buffer_bound(arg0: usize) -> usize {
-    upstream::stream_buffer_bound(arg0)
+    container::stream_buffer::stream_buffer_bound(arg0)
 }
 
 #[no_mangle]
@@ -674,7 +674,9 @@ pub unsafe extern "C" fn lzma_stream_buffer_decode(
     arg7: *mut usize,
     arg8: usize,
 ) -> lzma_ret {
-    upstream::stream_buffer_decode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    container::stream_buffer::stream_buffer_decode(
+        arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8,
+    )
 }
 
 #[no_mangle]
@@ -689,7 +691,7 @@ pub unsafe extern "C" fn lzma_stream_buffer_encode(
     arg6: *mut usize,
     arg7: usize,
 ) -> lzma_ret {
-    upstream::stream_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    container::stream_buffer::stream_buffer_encode(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 #[no_mangle]
@@ -699,7 +701,7 @@ pub unsafe extern "C" fn lzma_stream_decoder(
     arg1: u64,
     arg2: u32,
 ) -> lzma_ret {
-    upstream::stream_decoder(arg0, arg1, arg2)
+    container::stream::stream_decoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]
@@ -709,7 +711,7 @@ pub unsafe extern "C" fn lzma_stream_encoder(
     arg1: *const lzma_filter,
     arg2: lzma_check,
 ) -> lzma_ret {
-    upstream::stream_encoder(arg0, arg1, arg2)
+    container::stream::stream_encoder(arg0, arg1, arg2)
 }
 
 #[no_mangle]

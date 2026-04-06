@@ -16,9 +16,7 @@ default_aliases_obj="$compat_dir/linux_symver_defaults.o"
 
 mkdir -p "$compat_dir"
 
-if [[ ! -f "$static_lib" ]]; then
-  cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
-fi
+cargo build --manifest-path "$safe_dir/Cargo.toml" --release >/dev/null
 
 REPO_ROOT="$repo_root" python3 - <<'PY'
 import os

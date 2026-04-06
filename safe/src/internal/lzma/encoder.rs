@@ -13,14 +13,13 @@ pub(crate) fn encode_terminal(filter: &TerminalFilter, input: &[u8]) -> Result<V
             ..
         } => {
             let sink = Cursor::new(Vec::new());
-            let mut writer =
-                lzma_rust2::LzmaWriter::new_no_header(sink, options, *allow_eopm)
-                    .map_err(|_| LZMA_PROG_ERROR)?;
+            let mut writer = lzma_rust2::LzmaWriter::new_no_header(sink, options, *allow_eopm)
+                .map_err(|_| LZMA_PROG_ERROR)?;
             writer.write_all(input).map_err(|_| LZMA_PROG_ERROR)?;
             let sink = writer.finish().map_err(|_| LZMA_PROG_ERROR)?;
             Ok(sink.into_inner())
         }
-        TerminalFilter::Lzma2 { options } => {
+        TerminalFilter::Lzma2 { options, .. } => {
             let sink = Cursor::new(Vec::new());
             let mut writer = lzma_rust2::Lzma2Writer::new(sink, options.clone());
             writer.write_all(input).map_err(|_| LZMA_PROG_ERROR)?;
