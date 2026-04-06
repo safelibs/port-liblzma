@@ -143,8 +143,18 @@ struct DecoderShared {
     cond: Condvar,
 }
 
-struct DirectDecoder {
-    inner: lzma_stream,
+struct BufferedDirectDecoder {
+    chain: crate::internal::lzma::ParsedFilterChain,
+    decoded: Vec<u8>,
+    decoded_pos: usize,
+    consumed: usize,
+    ready: bool,
+    input_committed: bool,
+}
+
+enum DirectDecoder {
+    Streaming { inner: lzma_stream },
+    Buffered(BufferedDirectDecoder),
 }
 
 struct StreamDecoderMt {
@@ -749,15 +759,31 @@ impl StreamDecoderMt {
     }
 
     unsafe fn start_direct(&mut self, allocator: *const lzma_allocator) -> lzma_ret {
-        let mut inner = crate::ffi::types::LZMA_STREAM_INIT;
-        inner.allocator = allocator;
-        let ret = block::block_decoder(&mut inner, &mut self.block_options);
-        if ret != LZMA_OK {
-            return ret;
-        }
+        let direct = if self.block_options.compressed_size == LZMA_VLI_UNKNOWN {
+            let chain = match crate::internal::lzma::parse_filters(self.filters.as_ptr()) {
+                Ok(chain) => chain,
+                Err(ret) => return ret,
+            };
+            DirectDecoder::Buffered(BufferedDirectDecoder {
+                chain,
+                decoded: Vec::new(),
+                decoded_pos: 0,
+                consumed: 0,
+                ready: false,
+                input_committed: false,
+            })
+        } else {
+            let mut inner = crate::ffi::types::LZMA_STREAM_INIT;
+            inner.allocator = allocator;
+            let ret = block::block_decoder(&mut inner, &mut self.block_options);
+            if ret != LZMA_OK {
+                return ret;
+            }
+            DirectDecoder::Streaming { inner }
+        };
         filter::filters_free_impl(self.filters.as_mut_ptr(), allocator);
         self.block_options.filters = ptr::null_mut();
-        self.direct = Some(DirectDecoder { inner });
+        self.direct = Some(direct);
         self.mem_direct_mode = self.mem_next_filters;
         self.sequence = DecoderSequence::BlockDirectRun;
         LZMA_OK
@@ -774,11 +800,6 @@ impl StreamDecoderMt {
             out_total = out_total.saturating_add(state.progress_out as u64);
         }
         drop(shared);
-
-        if let Some(direct) = &self.direct {
-            in_total = in_total.saturating_add(direct.inner.total_in);
-            out_total = out_total.saturating_add(direct.inner.total_out);
-        }
 
         *progress_in = in_total;
         *progress_out = out_total;
@@ -1108,35 +1129,133 @@ impl StreamDecoderMt {
 
                 DecoderSequence::BlockDirectRun => {
                     let direct = self.direct.as_mut().expect("direct decoder");
-                    let in_old = *in_pos;
-                    let out_old = *out_pos;
-                    direct.inner.next_in = if *in_pos == in_size {
-                        ptr::null()
-                    } else {
-                        input.add(*in_pos)
-                    };
-                    direct.inner.avail_in = in_size - *in_pos;
-                    direct.inner.next_out = if *out_pos == out_size {
-                        ptr::null_mut()
-                    } else {
-                        output.add(*out_pos)
-                    };
-                    direct.inner.avail_out = out_size - *out_pos;
-                    let ret =
-                        crate::internal::stream_state::lzma_code_impl(&mut direct.inner, action);
-                    *in_pos = in_size - direct.inner.avail_in;
-                    *out_pos = out_size - direct.inner.avail_out;
-                    {
-                        let mut shared = lock(&self.shared.state);
-                        shared.progress_in += (*in_pos - in_old) as u64;
-                        shared.progress_out += (*out_pos - out_old) as u64;
-                    }
-                    if ret != LZMA_STREAM_END {
-                        if *out_pos == out_size && *out_pos != out_old {
-                            self.out_was_filled = true;
+                    match direct {
+                        DirectDecoder::Streaming { inner } => {
+                            let in_old = *in_pos;
+                            let out_old = *out_pos;
+                            inner.next_in = if *in_pos == in_size {
+                                ptr::null()
+                            } else {
+                                input.add(*in_pos)
+                            };
+                            inner.avail_in = in_size - *in_pos;
+                            inner.next_out = if *out_pos == out_size {
+                                ptr::null_mut()
+                            } else {
+                                output.add(*out_pos)
+                            };
+                            inner.avail_out = out_size - *out_pos;
+                            let ret = crate::internal::stream_state::lzma_code_impl(inner, action);
+                            *in_pos = in_size - inner.avail_in;
+                            *out_pos = out_size - inner.avail_out;
+                            {
+                                let mut shared = lock(&self.shared.state);
+                                shared.progress_in += (*in_pos - in_old) as u64;
+                                shared.progress_out += (*out_pos - out_old) as u64;
+                            }
+                            if ret != LZMA_STREAM_END {
+                                if *out_pos == out_size && *out_pos != out_old {
+                                    self.out_was_filled = true;
+                                }
+                                return ret;
+                            }
                         }
-                        return ret;
+                        DirectDecoder::Buffered(buffered) => {
+                            let in_old = *in_pos;
+                            let out_old = *out_pos;
+
+                            if !buffered.ready {
+                                if *in_pos >= in_size {
+                                    return LZMA_OK;
+                                }
+
+                                let input_slice = core::slice::from_raw_parts(
+                                    input.add(*in_pos),
+                                    in_size - *in_pos,
+                                );
+                                let (decoded, consumed) =
+                                    match crate::internal::lzma::decode_raw(&buffered.chain, input_slice)
+                                    {
+                                        Ok(result) => result,
+                                        Err(crate::ffi::types::LZMA_BUF_ERROR) => return LZMA_OK,
+                                        Err(ret) => return ret,
+                                    };
+
+                                let padding = (4usize.wrapping_sub(consumed & 3)) & 3;
+                                let check_size = check::check_size(self.block_options.check) as usize;
+                                let total = consumed
+                                    .saturating_add(padding)
+                                    .saturating_add(check_size);
+                                if input_slice.len() < total {
+                                    return LZMA_OK;
+                                }
+
+                                for byte in &input_slice[consumed..consumed + padding] {
+                                    if *byte != 0 {
+                                        return LZMA_DATA_ERROR;
+                                    }
+                                }
+
+                                let check_start = consumed + padding;
+                                self.block_options.raw_check[..check_size]
+                                    .copy_from_slice(&input_slice[check_start..check_start + check_size]);
+                                let ignore_check =
+                                    self.block_options.version >= 1 && self.block_options.ignore_check != 0;
+                                let verify_check =
+                                    !ignore_check && check::check_is_supported(self.block_options.check) != 0;
+                                if verify_check {
+                                    let mut state = match check::CheckState::new(self.block_options.check) {
+                                        Some(state) => state,
+                                        None => return LZMA_OPTIONS_ERROR,
+                                    };
+                                    state.update(&decoded);
+                                    if state.finish()[..check_size]
+                                        != self.block_options.raw_check[..check_size]
+                                    {
+                                        return LZMA_DATA_ERROR;
+                                    }
+                                }
+
+                                self.block_options.compressed_size = consumed as u64;
+                                self.block_options.uncompressed_size = decoded.len() as u64;
+                                buffered.decoded = decoded;
+                                buffered.decoded_pos = 0;
+                                buffered.consumed = total;
+                                buffered.ready = true;
+                            }
+
+                            if !buffered.input_committed {
+                                *in_pos += buffered.consumed;
+                                buffered.input_committed = true;
+                            }
+
+                            let copy_size = (buffered.decoded.len() - buffered.decoded_pos)
+                                .min(out_size - *out_pos);
+                            if copy_size != 0 {
+                                ptr::copy_nonoverlapping(
+                                    buffered.decoded.as_ptr().add(buffered.decoded_pos),
+                                    output.add(*out_pos),
+                                    copy_size,
+                                );
+                                buffered.decoded_pos += copy_size;
+                                *out_pos += copy_size;
+                            }
+
+                            {
+                                let mut shared = lock(&self.shared.state);
+                                shared.progress_in += (*in_pos - in_old) as u64;
+                                shared.progress_out += (*out_pos - out_old) as u64;
+                            }
+
+                            if buffered.decoded_pos < buffered.decoded.len() {
+                                if *out_pos == out_size && *out_pos != out_old {
+                                    self.out_was_filled = true;
+                                }
+                                return LZMA_OK;
+                            }
+                        }
                     }
+
                     let ret = index_hash_append(
                         self.index_hash,
                         block::block_unpadded_size(&self.block_options),
@@ -1145,7 +1264,9 @@ impl StreamDecoderMt {
                     if ret != LZMA_OK {
                         return ret;
                     }
-                    lzma_end_impl(&mut direct.inner);
+                    if let DirectDecoder::Streaming { inner } = direct {
+                        lzma_end_impl(inner);
+                    }
                     self.direct = None;
                     self.mem_direct_mode = 0;
                     self.sequence = DecoderSequence::BlockHeader;
@@ -1305,8 +1426,10 @@ unsafe fn decoder_end(coder: *mut c_void, allocator: *const lzma_allocator) {
         }
     }
     lock(&coder.shared.state).outq.end();
-    if let Some(mut direct) = coder.direct.take() {
-        lzma_end_impl(&mut direct.inner);
+    if let Some(direct) = coder.direct.take() {
+        if let DirectDecoder::Streaming { mut inner } = direct {
+            lzma_end_impl(&mut inner);
+        }
     }
     filter::filters_free_impl(coder.filters.as_mut_ptr(), allocator);
     index_hash_end(coder.index_hash, allocator);
@@ -1335,16 +1458,6 @@ pub(crate) unsafe fn stream_decoder_mt(
 ) -> lzma_ret {
     if strm.is_null() {
         return LZMA_PROG_ERROR;
-    }
-
-    if let Some(options_ref) = options.as_ref() {
-        if options_ref.threads == 1
-            || (options_ref.flags
-                & (LZMA_TELL_NO_CHECK | LZMA_TELL_UNSUPPORTED_CHECK | LZMA_TELL_ANY_CHECK))
-                != 0
-        {
-            return upstream::stream_decoder_mt(strm, options);
-        }
     }
 
     let coder = match StreamDecoderMt::new((*strm).allocator, options) {
@@ -1381,7 +1494,10 @@ mod tests {
         stream_state::{current_next_coder, lzma_code_impl, lzma_end_impl},
     };
 
-    unsafe fn make_stream_with_input(len: usize) -> (Vec<u8>, Vec<u8>) {
+    unsafe fn make_stream_with_input_and_check(
+        len: usize,
+        check: crate::ffi::types::lzma_check,
+    ) -> (Vec<u8>, Vec<u8>) {
         let mut input = vec![0u8; len];
         for (i, byte) in input.iter_mut().enumerate() {
             *byte = (i.wrapping_mul(17) % 251) as u8;
@@ -1418,7 +1534,7 @@ mod tests {
         assert_eq!(
             stream_buffer::stream_buffer_encode(
                 filters.as_mut_ptr(),
-                LZMA_CHECK_CRC32,
+                check,
                 ptr::null(),
                 input.as_ptr(),
                 input.len(),
@@ -1430,6 +1546,10 @@ mod tests {
         );
         encoded.truncate(out_pos);
         (input, encoded)
+    }
+
+    unsafe fn make_stream_with_input(len: usize) -> (Vec<u8>, Vec<u8>) {
+        make_stream_with_input_and_check(len, LZMA_CHECK_CRC32)
     }
 
     unsafe fn make_stream() -> Vec<u8> {
@@ -1503,6 +1623,223 @@ mod tests {
                 "threaded decoder should finish without timing out"
             );
             assert!(!decoded.is_empty());
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn decoder_mt_keeps_threaded_coder_for_single_thread_options() {
+        unsafe {
+            let mt = lzma_mt {
+                flags: 0,
+                threads: 1,
+                block_size: 0,
+                timeout: 1,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+
+            let next = current_next_coder(&strm).expect("mt decoder should stay installed");
+            assert_eq!(next.code as *const (), decoder_code as *const ());
+            assert_eq!(
+                next.get_progress.map(|f| f as *const ()),
+                Some(decoder_get_progress as *const ()),
+            );
+            assert_eq!(
+                next.memconfig.map(|f| f as *const ()),
+                Some(decoder_memconfig as *const ()),
+            );
+
+            let decoder = &*next.coder.cast::<StreamDecoderMt>();
+            assert_eq!(decoder.workers.len(), 1);
+            assert_eq!(decoder.timeout, 1);
+            assert_eq!(decoder.memlimit_threading, 1 << 26);
+            assert_eq!(decoder.memlimit_stop, 1 << 26);
+
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn decoder_mt_keeps_threaded_coder_with_tell_flags() {
+        unsafe {
+            let mt = lzma_mt {
+                flags: LZMA_TELL_ANY_CHECK,
+                threads: 2,
+                block_size: 0,
+                timeout: 1,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+
+            let next = current_next_coder(&strm).expect("mt decoder should stay installed");
+            assert_eq!(next.code as *const (), decoder_code as *const ());
+
+            let decoder = &*next.coder.cast::<StreamDecoderMt>();
+            assert_eq!(decoder.workers.len(), 2);
+            assert!(decoder.tell_any_check);
+            assert_eq!(decoder.timeout, 1);
+
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn tell_no_check_second_call_reaches_stream_end() {
+        unsafe {
+            let encoded =
+                make_stream_with_input_and_check(13, crate::ffi::types::LZMA_CHECK_NONE).1;
+            let mt = lzma_mt {
+                flags: LZMA_TELL_NO_CHECK | LZMA_TELL_UNSUPPORTED_CHECK | LZMA_TELL_ANY_CHECK,
+                threads: 2,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 1 << 26,
+                memlimit_stop: 1 << 26,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+            strm.next_in = encoded.as_ptr();
+            strm.avail_in = encoded.len();
+            let mut out = [0u8; 128];
+            strm.next_out = out.as_mut_ptr();
+            strm.avail_out = out.len();
+
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_NO_CHECK);
+            assert_eq!(decoder_get_check(decoder_from_stream(&strm).cast()), crate::ffi::types::LZMA_CHECK_NONE);
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_STREAM_END);
+
+            lzma_end_impl(&mut strm);
+        }
+    }
+
+    #[test]
+    fn upstream_no_check_fixture_finishes_on_second_tell_call() {
+        unsafe {
+            let encoded = include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/upstream/files/good-1-check-none.xz"
+            ));
+            let mt = lzma_mt {
+                flags: LZMA_TELL_NO_CHECK | LZMA_TELL_UNSUPPORTED_CHECK | LZMA_TELL_ANY_CHECK,
+                threads: 2,
+                block_size: 0,
+                timeout: 0,
+                preset: 0,
+                filters: ptr::null(),
+                check: 0,
+                reserved_enum1: 0,
+                reserved_enum2: 0,
+                reserved_enum3: 0,
+                reserved_int1: 0,
+                reserved_int2: 0,
+                reserved_int3: 0,
+                reserved_int4: 0,
+                memlimit_threading: 2 << 20,
+                memlimit_stop: 2 << 20,
+                reserved_int7: 0,
+                reserved_int8: 0,
+                reserved_ptr1: ptr::null_mut(),
+                reserved_ptr2: ptr::null_mut(),
+                reserved_ptr3: ptr::null_mut(),
+                reserved_ptr4: ptr::null_mut(),
+            };
+
+            let mut strm = crate::ffi::types::LZMA_STREAM_INIT;
+            assert_eq!(stream_decoder_mt(&mut strm, &mt), LZMA_OK);
+            let mut out = [0u8; 128];
+            strm.next_in = encoded.as_ptr();
+            strm.avail_in = encoded.len();
+            strm.next_out = out.as_mut_ptr();
+            strm.avail_out = out.len();
+
+            assert_eq!(lzma_code_impl(&mut strm, LZMA_RUN), LZMA_NO_CHECK);
+            assert_eq!(
+                crate::internal::stream_state::lzma_get_check_impl(&strm),
+                crate::ffi::types::LZMA_CHECK_NONE
+            );
+            let ret = lzma_code_impl(&mut strm, LZMA_RUN);
+            if ret != LZMA_STREAM_END {
+                let decoder = &*decoder_from_stream(&strm);
+                panic!(
+                    "ret={ret} seq={} avail_in={} avail_out={} comp={} uncomp={} pending={}",
+                    match decoder.sequence {
+                        DecoderSequence::StreamHeader => "stream-header",
+                        DecoderSequence::BlockHeader => "block-header",
+                        DecoderSequence::BlockInit => "block-init",
+                        DecoderSequence::BlockThreadInit => "block-thread-init",
+                        DecoderSequence::BlockThreadRun => "block-thread-run",
+                        DecoderSequence::BlockDirectInit => "block-direct-init",
+                        DecoderSequence::BlockDirectRun => "block-direct-run",
+                        DecoderSequence::IndexWaitOutput => "index-wait-output",
+                        DecoderSequence::IndexDecode => "index-decode",
+                        DecoderSequence::StreamFooter => "stream-footer",
+                        DecoderSequence::StreamPadding => "stream-padding",
+                        DecoderSequence::Error => "error",
+                    },
+                    strm.avail_in,
+                    strm.avail_out,
+                    decoder.block_options.compressed_size,
+                    decoder.block_options.uncompressed_size,
+                    decoder.pending_error,
+                );
+            }
+
             lzma_end_impl(&mut strm);
         }
     }
