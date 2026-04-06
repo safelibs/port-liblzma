@@ -397,19 +397,23 @@ pub(crate) unsafe fn block_buffer_decode(
     let check_ptr = input.add(in_start + compressed_size);
     ptr::copy_nonoverlapping(check_ptr, (*block).raw_check.as_mut_ptr(), check_size);
 
-    let mut state = match CheckState::new((*block).check) {
-        Some(state) => state,
-        None => {
+    let ignore_check = (*block).version >= 1 && (*block).ignore_check != 0;
+    let verify_check = !ignore_check && check::check_is_supported((*block).check) != 0;
+    if verify_check {
+        let mut state = match CheckState::new((*block).check) {
+            Some(state) => state,
+            None => {
+                *input_pos = in_start;
+                *output_pos = out_start;
+                return LZMA_OPTIONS_ERROR;
+            }
+        };
+        state.update(&decoded);
+        if state.finish()[..check_size] != (&(*block).raw_check)[..check_size] {
             *input_pos = in_start;
             *output_pos = out_start;
-            return LZMA_OPTIONS_ERROR;
+            return crate::ffi::types::LZMA_DATA_ERROR;
         }
-    };
-    state.update(&decoded);
-    if state.finish()[..check_size] != (&(*block).raw_check)[..check_size] {
-        *input_pos = in_start;
-        *output_pos = out_start;
-        return crate::ffi::types::LZMA_DATA_ERROR;
     }
 
     let padding_start = in_start + compressed_size + check_size;

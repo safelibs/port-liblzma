@@ -15,6 +15,7 @@ use crate::internal::lz;
 use crate::internal::simple::{self, SimpleFilterKind};
 
 pub(crate) const LZMA_LZMA1EXT_ALLOW_EOPM: u32 = 0x01;
+pub(crate) const LZMA_MEMUSAGE_BASE: u64 = 1 << 15;
 
 #[derive(Clone)]
 pub(crate) enum Prefilter {
@@ -178,26 +179,46 @@ pub(crate) unsafe fn parse_filters(filters: *const lzma_filter) -> Result<Parsed
 
 pub(crate) unsafe fn encoder_memusage(filters: *const lzma_filter) -> u64 {
     match parse_filters(filters) {
-        Ok(chain) => match chain.terminal {
-            TerminalFilter::Lzma1 { options, .. } => options.get_memory_usage() as u64,
-            TerminalFilter::Lzma2 { options } => options.lzma_options.get_memory_usage() as u64,
-        },
+        Ok(chain) => {
+            let prefilter_usage = (chain.prefilters.len() as u64).saturating_mul(1024);
+            let terminal_usage_kib = match chain.terminal {
+                TerminalFilter::Lzma1 { options, .. } => options.get_memory_usage() as u64,
+                TerminalFilter::Lzma2 { options } => options.lzma_options.get_memory_usage() as u64,
+            };
+
+            terminal_usage_kib
+                .saturating_mul(1024)
+                .saturating_add(prefilter_usage)
+                .saturating_add(LZMA_MEMUSAGE_BASE)
+        }
         Err(_) => u64::MAX,
     }
 }
 
 pub(crate) unsafe fn decoder_memusage(filters: *const lzma_filter) -> u64 {
     match parse_filters(filters) {
-        Ok(chain) => match chain.terminal {
-            TerminalFilter::Lzma1 {
-                options, ..
-            } => lzma_rust2::lzma_get_memory_usage(options.dict_size, options.lc, options.lp)
-                .map(u64::from)
-                .unwrap_or(u64::MAX),
-            TerminalFilter::Lzma2 { options } => u64::from(lzma_rust2::lzma2_get_memory_usage(
-                options.lzma_options.dict_size,
-            )),
-        },
+        Ok(chain) => {
+            let prefilter_usage = (chain.prefilters.len() as u64).saturating_mul(1024);
+            let terminal_usage_kib = match chain.terminal {
+                TerminalFilter::Lzma1 {
+                    options, ..
+                } => lzma_rust2::lzma_get_memory_usage(options.dict_size, options.lc, options.lp)
+                    .map(u64::from)
+                    .unwrap_or(u64::MAX),
+                TerminalFilter::Lzma2 { options } => u64::from(lzma_rust2::lzma2_get_memory_usage(
+                    options.lzma_options.dict_size,
+                )),
+            };
+
+            if terminal_usage_kib == u64::MAX {
+                u64::MAX
+            } else {
+                terminal_usage_kib
+                    .saturating_mul(1024)
+                    .saturating_add(prefilter_usage)
+                    .saturating_add(LZMA_MEMUSAGE_BASE)
+            }
+        }
         Err(_) => u64::MAX,
     }
 }

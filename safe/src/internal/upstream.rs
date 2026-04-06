@@ -8,9 +8,10 @@ use std::{
 };
 
 use crate::ffi::types::{
-    lzma_action, lzma_allocator, lzma_block, lzma_check, lzma_filter, lzma_options_lzma, lzma_ret,
-    lzma_stream, LZMA_BUF_ERROR, LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END,
-    LZMA_UNSUPPORTED_CHECK, LZMA_VLI_UNKNOWN,
+    lzma_action, lzma_allocator, lzma_block, lzma_check, lzma_filter, lzma_mt,
+    lzma_options_lzma, lzma_ret, lzma_stream, LZMA_BUF_ERROR, LZMA_GET_CHECK, LZMA_NO_CHECK,
+    LZMA_OK, LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
+    LZMA_VLI_UNKNOWN,
 };
 use crate::internal::block;
 use crate::internal::check;
@@ -19,12 +20,25 @@ use crate::internal::common::{
     LZMA_SYNC_FLUSH,
 };
 use crate::internal::filter;
-use crate::internal::lzma::{self, ParsedFilterChain, Prefilter, TerminalFilter};
+use crate::internal::lzma::{self, ParsedFilterChain, Prefilter, TerminalFilter, LZMA_MEMUSAGE_BASE};
 use crate::internal::preset;
 use crate::internal::stream_state::{current_next_coder, install_next_coder, NextCoder};
 use crate::internal::vli::lzma_vli_encode_impl;
 
 const STREAM_ENCODER_MAGIC: u64 = 0x7366_6c74_5f78_7a31;
+const LZMA_TELL_NO_CHECK: u32 = 0x01;
+const LZMA_TELL_UNSUPPORTED_CHECK: u32 = 0x02;
+const LZMA_TELL_ANY_CHECK: u32 = 0x04;
+const LZMA_CONCATENATED: u32 = 0x08;
+const LZMA_IGNORE_CHECK: u32 = 0x10;
+const LZMA_FAIL_FAST: u32 = 0x20;
+const STREAM_DECODER_SUPPORTED_FLAGS: u32 = LZMA_TELL_NO_CHECK
+    | LZMA_TELL_UNSUPPORTED_CHECK
+    | LZMA_TELL_ANY_CHECK
+    | LZMA_CONCATENATED
+    | LZMA_IGNORE_CHECK
+    | LZMA_FAIL_FAST;
+const LZMA_THREADS_MAX: u32 = 16384;
 
 #[derive(Clone, Copy)]
 struct IndexRecord {
@@ -95,7 +109,11 @@ struct StreamDecoderCoder {
     output: Vec<u8>,
     output_pos: usize,
     memlimit: u64,
+    memusage: u64,
     flags: u32,
+    check: lzma_check,
+    pending_ret: lzma_ret,
+    header_parsed: bool,
     decoded: bool,
 }
 
@@ -598,7 +616,7 @@ fn parse_index_records(input: &[u8]) -> Result<Vec<IndexRecord>, lzma_ret> {
     Ok(records)
 }
 
-fn decode_single_xz_stream_fallback(input: &[u8]) -> Result<(usize, Vec<u8>), lzma_ret> {
+fn decode_single_xz_stream_fallback(input: &[u8], ignore_check: bool) -> Result<(usize, Vec<u8>), lzma_ret> {
     use crate::ffi::types::lzma_stream_flags;
     use crate::internal::stream_flags::{
         stream_flags_compare_impl, stream_footer_decode_impl, stream_header_decode_impl,
@@ -676,6 +694,11 @@ fn decode_single_xz_stream_fallback(input: &[u8]) -> Result<(usize, Vec<u8>), lz
                 return Err(ret);
             }
         }
+        block_options.ignore_check = if ignore_check || check::check_is_supported(header_flags.check) == 0 {
+            1
+        } else {
+            0
+        };
 
         let mut in_pos = block_start + block_options.header_size as usize;
         let block_end = block_start + unsafe { block::block_total_size(&block_options) as usize };
@@ -707,6 +730,142 @@ fn decode_single_xz_stream_fallback(input: &[u8]) -> Result<(usize, Vec<u8>), lz
     }
 
     Ok((input.len(), output))
+}
+
+fn xz_stream_check(input: &[u8]) -> Result<Option<lzma_check>, lzma_ret> {
+    use crate::ffi::types::lzma_stream_flags;
+    use crate::internal::stream_flags::{stream_header_decode_impl, LZMA_STREAM_HEADER_SIZE};
+
+    if input.len() < LZMA_STREAM_HEADER_SIZE {
+        return Ok(None);
+    }
+
+    let mut header_flags: lzma_stream_flags = unsafe { mem::zeroed() };
+    let ret = unsafe { stream_header_decode_impl(&mut header_flags, input.as_ptr()) };
+    if ret != LZMA_OK {
+        return Err(ret);
+    }
+
+    Ok(Some(header_flags.check))
+}
+
+fn inspect_single_xz_stream(input: &[u8]) -> Result<(lzma_check, u64), lzma_ret> {
+    use crate::ffi::types::lzma_stream_flags;
+    use crate::internal::stream_flags::{
+        stream_flags_compare_impl, stream_footer_decode_impl, stream_header_decode_impl,
+        LZMA_STREAM_HEADER_SIZE,
+    };
+
+    if input.len() < LZMA_STREAM_HEADER_SIZE * 2 {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
+    }
+
+    let mut header_flags: lzma_stream_flags = unsafe { mem::zeroed() };
+    let mut footer_flags: lzma_stream_flags = unsafe { mem::zeroed() };
+
+    unsafe {
+        let ret = stream_header_decode_impl(&mut header_flags, input.as_ptr());
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        let ret = stream_footer_decode_impl(
+            &mut footer_flags,
+            input.as_ptr().add(input.len() - LZMA_STREAM_HEADER_SIZE),
+        );
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        let ret = stream_flags_compare_impl(&header_flags, &footer_flags);
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+    }
+
+    let index_size = footer_flags.backward_size as usize;
+    if input.len() < LZMA_STREAM_HEADER_SIZE + index_size + LZMA_STREAM_HEADER_SIZE {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
+    }
+
+    let index_start = input.len() - LZMA_STREAM_HEADER_SIZE - index_size;
+    let records = parse_index_records(&input[index_start..input.len() - LZMA_STREAM_HEADER_SIZE])?;
+    let mut block_start = LZMA_STREAM_HEADER_SIZE;
+    let mut max_memusage = LZMA_MEMUSAGE_BASE;
+
+    for record in records {
+        let mut decoded_filters = [lzma_filter {
+            id: LZMA_VLI_UNKNOWN,
+            options: ptr::null_mut(),
+        }; crate::ffi::types::LZMA_FILTERS_MAX + 1];
+        let mut block_options: lzma_block = unsafe { mem::zeroed() };
+        block_options.version = 1;
+        block_options.check = header_flags.check;
+        block_options.header_size = ((input[block_start] as u32) + 1) * 4;
+        block_options.filters = decoded_filters.as_mut_ptr();
+
+        let ret = unsafe {
+            block::block_header_decode(&mut block_options, ptr::null(), input.as_ptr().add(block_start))
+        };
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        let memusage = unsafe { lzma::decoder_memusage(decoded_filters.as_ptr()) };
+        unsafe {
+            filter::filters_free_impl(decoded_filters.as_mut_ptr(), ptr::null());
+        }
+        if memusage == u64::MAX {
+            return Err(LZMA_OPTIONS_ERROR);
+        }
+        max_memusage = max_memusage.max(memusage);
+
+        let ret = unsafe { block::block_compressed_size(&mut block_options, record.unpadded_size) };
+        if ret != LZMA_OK {
+            return Err(ret);
+        }
+
+        let block_end = block_start + unsafe { block::block_total_size(&block_options) as usize };
+        if block_end > index_start {
+            return Err(crate::ffi::types::LZMA_DATA_ERROR);
+        }
+        block_start = block_end;
+    }
+
+    if block_start != index_start {
+        return Err(crate::ffi::types::LZMA_DATA_ERROR);
+    }
+
+    Ok((header_flags.check, max_memusage))
+}
+
+fn inspect_xz_stream(input: &[u8], concatenated: bool) -> Result<(lzma_check, u64), lzma_ret> {
+    if !concatenated {
+        return inspect_single_xz_stream(input);
+    }
+
+    let mut offset = 0usize;
+    let mut max_memusage = LZMA_MEMUSAGE_BASE;
+    let mut first_check = crate::ffi::types::LZMA_CHECK_NONE;
+
+    while offset < input.len() {
+        while offset < input.len() && input[offset] == 0 {
+            offset += 1;
+        }
+
+        if offset == input.len() {
+            break;
+        }
+
+        let (check, memusage) = inspect_single_xz_stream(&input[offset..])?;
+        if first_check == crate::ffi::types::LZMA_CHECK_NONE {
+            first_check = check;
+        }
+        max_memusage = max_memusage.max(memusage);
+        offset = input.len();
+    }
+
+    Ok((first_check, max_memusage))
 }
 
 unsafe fn encode_block_with_filters(
@@ -748,7 +907,7 @@ unsafe fn encode_block_with_filters(
     Ok((encoded, record))
 }
 
-fn decode_xz_stream_once(input: &[u8], concatenated: bool) -> Result<(usize, Vec<u8>), lzma_ret> {
+fn decode_xz_stream_once(input: &[u8], concatenated: bool, ignore_check: bool) -> Result<(usize, Vec<u8>), lzma_ret> {
     let cursor = Cursor::new(input);
     let mut reader = lzma_rust2::XzReader::new(cursor, concatenated);
     let mut output = Vec::new();
@@ -759,7 +918,7 @@ fn decode_xz_stream_once(input: &[u8], concatenated: bool) -> Result<(usize, Vec
         }
         Err(error) => {
             if !concatenated {
-                decode_single_xz_stream_fallback(input)
+                decode_single_xz_stream_fallback(input, ignore_check)
             } else {
                 Err(lzma::io_error_to_ret(&error))
             }
@@ -1016,6 +1175,10 @@ unsafe fn stream_get_check(coder: *const c_void) -> lzma_check {
     (*(coder.cast::<StreamEncoderCoder>())).check
 }
 
+unsafe fn stream_decoder_get_check(coder: *const c_void) -> lzma_check {
+    (*(coder.cast::<StreamDecoderCoder>())).check
+}
+
 unsafe fn stream_decoder_code(
     coder: *mut c_void,
     _allocator: *const lzma_allocator,
@@ -1041,7 +1204,66 @@ unsafe fn stream_decoder_code(
         return LZMA_STREAM_END;
     }
 
-    match decode_xz_stream_once(&coder.input, (coder.flags & 0x08) != 0) {
+    if !coder.header_parsed {
+        match xz_stream_check(&coder.input) {
+            Ok(Some(check_id)) => {
+                coder.check = check_id;
+                coder.header_parsed = true;
+                coder.pending_ret = if (coder.flags & LZMA_TELL_NO_CHECK) != 0
+                    && check_id == crate::ffi::types::LZMA_CHECK_NONE
+                {
+                    LZMA_NO_CHECK
+                } else if (coder.flags & LZMA_TELL_UNSUPPORTED_CHECK) != 0
+                    && check::check_is_supported(check_id) == 0
+                {
+                    LZMA_UNSUPPORTED_CHECK
+                } else if (coder.flags & LZMA_TELL_ANY_CHECK) != 0 {
+                    LZMA_GET_CHECK
+                } else {
+                    LZMA_OK
+                };
+            }
+            Ok(None) => {
+                return if action == crate::internal::common::LZMA_FINISH {
+                    LZMA_BUF_ERROR
+                } else {
+                    LZMA_OK
+                };
+            }
+            Err(ret) => {
+                return if action == crate::internal::common::LZMA_FINISH && ret == crate::ffi::types::LZMA_DATA_ERROR {
+                    LZMA_BUF_ERROR
+                } else if action == crate::internal::common::LZMA_FINISH {
+                    ret
+                } else {
+                    LZMA_OK
+                };
+            }
+        }
+    }
+
+    if coder.pending_ret != LZMA_OK {
+        let ret = coder.pending_ret;
+        coder.pending_ret = LZMA_OK;
+        return ret;
+    }
+
+    if coder.memusage == LZMA_MEMUSAGE_BASE || (coder.flags & LZMA_CONCATENATED) != 0 {
+        if let Ok((check_id, memusage)) = inspect_xz_stream(&coder.input, (coder.flags & LZMA_CONCATENATED) != 0) {
+            coder.check = check_id;
+            coder.memusage = memusage.max(LZMA_MEMUSAGE_BASE);
+        }
+    }
+
+    if coder.memusage > coder.memlimit.max(1) {
+        return crate::ffi::types::LZMA_MEMLIMIT_ERROR;
+    }
+
+    match decode_xz_stream_once(
+        &coder.input,
+        (coder.flags & LZMA_CONCATENATED) != 0,
+        (coder.flags & LZMA_IGNORE_CHECK) != 0,
+    ) {
         Ok((_consumed, decoded)) => {
             coder.output = decoded;
             coder.output_pos = 0;
@@ -1074,9 +1296,13 @@ unsafe fn stream_decoder_memconfig(
     new_memlimit: u64,
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<StreamDecoderCoder>();
-    *memusage = 1;
+    *memusage = coder.memusage.max(LZMA_MEMUSAGE_BASE);
     *old_memlimit = coder.memlimit.max(1);
     if new_memlimit != 0 {
+        let new_memlimit = new_memlimit.max(1);
+        if new_memlimit < coder.memusage.max(LZMA_MEMUSAGE_BASE) {
+            return crate::ffi::types::LZMA_MEMLIMIT_ERROR;
+        }
         coder.memlimit = new_memlimit;
     }
     LZMA_OK
@@ -1332,7 +1558,8 @@ pub(crate) unsafe fn stream_buffer_decode(
 
     let (consumed, decoded) = match decode_xz_stream_once(
         core::slice::from_raw_parts(input.add(*input_pos), input_size - *input_pos),
-        (flags & 0x08) != 0,
+        (flags & LZMA_CONCATENATED) != 0,
+        (flags & LZMA_IGNORE_CHECK) != 0,
     ) {
         Ok(result) => result,
         Err(ret) => return ret,
@@ -1390,6 +1617,9 @@ pub(crate) unsafe fn stream_decoder(strm: *mut lzma_stream, memlimit: u64, flags
     if strm.is_null() {
         return LZMA_PROG_ERROR;
     }
+    if (flags & !STREAM_DECODER_SUPPORTED_FLAGS) != 0 {
+        return LZMA_OPTIONS_ERROR;
+    }
     install_next_coder(
         strm,
         NextCoder {
@@ -1397,15 +1627,19 @@ pub(crate) unsafe fn stream_decoder(strm: *mut lzma_stream, memlimit: u64, flags
                 input: Vec::new(),
                 output: Vec::new(),
                 output_pos: 0,
-                memlimit,
+                memlimit: memlimit.max(1),
+                memusage: LZMA_MEMUSAGE_BASE,
                 flags,
+                check: crate::ffi::types::LZMA_CHECK_NONE,
+                pending_ret: LZMA_OK,
+                header_parsed: false,
                 decoded: false,
             }))
             .cast(),
             code: stream_decoder_code,
             end: Some(stream_decoder_end),
             get_progress: None,
-            get_check: None,
+            get_check: Some(stream_decoder_get_check),
             memconfig: Some(stream_decoder_memconfig),
         },
         all_supported_actions(),
@@ -1483,12 +1717,17 @@ pub(crate) unsafe fn easy_encoder_memusage(preset_id: u32) -> u64 {
     if preset::lzma_lzma_preset_impl(&mut options, preset_id & LZMA_PRESET_LEVEL_MASK) != 0 {
         return u64::from(u32::MAX);
     }
-    lzma_rust2::Lzma2Options {
-        lzma_options: lzma_rust2::LzmaOptions::with_preset(preset_id & LZMA_PRESET_LEVEL_MASK),
-        ..Default::default()
-    }
-    .lzma_options
-    .get_memory_usage() as u64
+    let filters = [
+        lzma_filter {
+            id: crate::internal::filter::common::LZMA_FILTER_LZMA2,
+            options: (&mut options as *mut lzma_options_lzma).cast(),
+        },
+        lzma_filter {
+            id: LZMA_VLI_UNKNOWN,
+            options: ptr::null_mut(),
+        },
+    ];
+    lzma::encoder_memusage(filters.as_ptr())
 }
 
 pub(crate) unsafe fn easy_decoder_memusage(preset_id: u32) -> u64 {
@@ -1496,11 +1735,37 @@ pub(crate) unsafe fn easy_decoder_memusage(preset_id: u32) -> u64 {
     if preset::lzma_lzma_preset_impl(&mut options, preset_id & LZMA_PRESET_LEVEL_MASK) != 0 {
         return u64::from(u32::MAX);
     }
-    u64::from(lzma_rust2::lzma2_get_memory_usage(options.dict_size))
+    let filters = [
+        lzma_filter {
+            id: crate::internal::filter::common::LZMA_FILTER_LZMA2,
+            options: (&mut options as *mut lzma_options_lzma).cast(),
+        },
+        lzma_filter {
+            id: LZMA_VLI_UNKNOWN,
+            options: ptr::null_mut(),
+        },
+    ];
+    lzma::decoder_memusage(filters.as_ptr())
 }
 
 pub(crate) unsafe fn auto_decoder(strm: *mut lzma_stream, memlimit: u64, flags: u32) -> lzma_ret {
     stream_decoder(strm, memlimit, flags)
+}
+
+pub(crate) unsafe fn stream_decoder_mt(strm: *mut lzma_stream, options: *const lzma_mt) -> lzma_ret {
+    if strm.is_null() || options.is_null() {
+        return LZMA_PROG_ERROR;
+    }
+
+    let options = &*options;
+    if options.threads == 0 || options.threads > LZMA_THREADS_MAX {
+        return LZMA_OPTIONS_ERROR;
+    }
+    if (options.flags & !STREAM_DECODER_SUPPORTED_FLAGS) != 0 {
+        return LZMA_OPTIONS_ERROR;
+    }
+
+    stream_decoder(strm, options.memlimit_stop.max(1), options.flags)
 }
 
 #[cfg(test)]

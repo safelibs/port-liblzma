@@ -2,9 +2,9 @@ use core::ffi::c_void;
 use core::ptr;
 use std::io::{Cursor, Read, Write};
 
-use crate::ffi::types::{lzma_action, lzma_allocator, lzma_options_lzma, lzma_ret, lzma_stream, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END};
+use crate::ffi::types::{lzma_action, lzma_allocator, lzma_options_lzma, lzma_ret, lzma_stream, LZMA_MEMLIMIT_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END};
 use crate::internal::common::{all_supported_actions, LZMA_FINISH};
-use crate::internal::lzma::io_error_to_ret;
+use crate::internal::lzma::{io_error_to_ret, LZMA_MEMUSAGE_BASE};
 use crate::internal::stream_state::{install_next_coder, NextCoder};
 
 struct AloneEncoder {
@@ -21,6 +21,24 @@ struct AloneDecoder {
     output: Vec<u8>,
     output_pos: usize,
     decoded: bool,
+}
+
+const ALONE_HEADER_SIZE: usize = 1 + 4 + 8;
+
+fn alone_header_memusage(input: &[u8]) -> Option<u64> {
+    if input.len() < ALONE_HEADER_SIZE {
+        return None;
+    }
+
+    let props = input[0];
+    let dict_size = u32::from_le_bytes([input[1], input[2], input[3], input[4]]);
+    lzma_rust2::lzma_get_memory_usage_by_props(dict_size, props)
+        .ok()
+        .map(|usage_kib| {
+            u64::from(usage_kib)
+                .saturating_mul(1024)
+                .saturating_add(LZMA_MEMUSAGE_BASE)
+        })
 }
 
 unsafe fn copy_output(output_buf: &[u8], output_pos_state: &mut usize, output: *mut u8, out_pos: *mut usize, out_size: usize) -> lzma_ret {
@@ -118,6 +136,13 @@ unsafe fn alone_decoder_code(
         *in_pos = in_size;
     }
 
+    if let Some(memusage) = alone_header_memusage(&coder.input) {
+        coder.memusage = memusage;
+        if coder.memusage > coder.memlimit.max(1) {
+            return LZMA_MEMLIMIT_ERROR;
+        }
+    }
+
     if coder.decoded {
         return LZMA_STREAM_END;
     }
@@ -127,7 +152,6 @@ unsafe fn alone_decoder_code(
     }
 
     let memlimit_kib = ((coder.memlimit.max(1) + 1023) / 1024).min(u32::MAX as u64) as u32;
-    coder.memusage = 1;
     let mut reader =
         match lzma_rust2::LzmaReader::new_mem_limit(Cursor::new(&coder.input), memlimit_kib, None)
         {
@@ -158,11 +182,15 @@ unsafe fn alone_decoder_memconfig(
     new_memlimit: u64,
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<AloneDecoder>();
-    *memusage = coder.memusage.max(1);
+    *memusage = coder.memusage.max(LZMA_MEMUSAGE_BASE);
     *old_memlimit = coder.memlimit.max(1);
 
     if new_memlimit != 0 {
-        coder.memlimit = new_memlimit.max(1);
+        let new_memlimit = new_memlimit.max(1);
+        if new_memlimit < coder.memusage.max(LZMA_MEMUSAGE_BASE) {
+            return LZMA_MEMLIMIT_ERROR;
+        }
+        coder.memlimit = new_memlimit;
     }
 
     LZMA_OK
@@ -202,8 +230,8 @@ pub(crate) unsafe fn alone_decoder(strm: *mut lzma_stream, memlimit: u64) -> lzm
         strm,
         NextCoder {
             coder: Box::into_raw(Box::new(AloneDecoder {
-                memlimit,
-                memusage: 1,
+                memlimit: memlimit.max(1),
+                memusage: LZMA_MEMUSAGE_BASE,
                 input: Vec::new(),
                 output: Vec::new(),
                 output_pos: 0,

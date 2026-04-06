@@ -893,7 +893,7 @@ pub unsafe extern "C" fn lzma_stream_decoder_mt(
     arg0: *mut lzma_stream,
     arg1: *const lzma_mt,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    upstream::stream_decoder_mt(arg0, arg1)
 }
 
 #[no_mangle]
