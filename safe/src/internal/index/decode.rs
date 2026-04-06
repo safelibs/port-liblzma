@@ -325,6 +325,7 @@ pub(crate) unsafe fn index_decoder(
         get_progress: None,
         get_check: None,
         memconfig: Some(decoder_memconfig),
+        update: None,
     };
 
     let ret = install_next_coder(strm, next, decoder_supported_actions());

@@ -3,9 +3,9 @@ use core::mem;
 use core::ptr;
 
 use crate::ffi::types::{
-    lzma_action, lzma_allocator, lzma_check, lzma_internal, lzma_ret, lzma_stream, LZMA_BUF_ERROR,
-    LZMA_GET_CHECK, LZMA_MEMLIMIT_ERROR, LZMA_MEM_ERROR, LZMA_NO_CHECK, LZMA_OK, LZMA_PROG_ERROR,
-    LZMA_SEEK_NEEDED, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
+    lzma_action, lzma_allocator, lzma_check, lzma_filter, lzma_internal, lzma_ret, lzma_stream,
+    LZMA_BUF_ERROR, LZMA_GET_CHECK, LZMA_MEMLIMIT_ERROR, LZMA_MEM_ERROR, LZMA_NO_CHECK, LZMA_OK,
+    LZMA_PROG_ERROR, LZMA_SEEK_NEEDED, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK,
 };
 use crate::internal::common::{
     action_index, default_supported_actions, lzma_alloc, lzma_free, reserved_members_are_clear,
@@ -35,6 +35,11 @@ pub(crate) type MemConfigFn = unsafe fn(
     old_memlimit: *mut u64,
     new_memlimit: u64,
 ) -> lzma_ret;
+pub(crate) type UpdateFn = unsafe fn(
+    coder: *mut c_void,
+    allocator: *const lzma_allocator,
+    filters: *const lzma_filter,
+) -> lzma_ret;
 
 #[derive(Copy, Clone)]
 pub(crate) struct NextCoder {
@@ -44,6 +49,7 @@ pub(crate) struct NextCoder {
     pub(crate) get_progress: Option<GetProgressFn>,
     pub(crate) get_check: Option<GetCheckFn>,
     pub(crate) memconfig: Option<MemConfigFn>,
+    pub(crate) update: Option<UpdateFn>,
 }
 
 pub(crate) enum CoderInterface {
@@ -430,6 +436,26 @@ pub(crate) unsafe fn lzma_memlimit_set_impl(strm: *mut lzma_stream, new_memlimit
     memconfig(next.coder, &mut memusage, &mut old_memlimit, new_memlimit)
 }
 
+pub(crate) unsafe fn lzma_filters_update_impl(
+    strm: *mut lzma_stream,
+    filters: *const lzma_filter,
+) -> lzma_ret {
+    if strm.is_null() || (*strm).internal.is_null() || filters.is_null() {
+        return LZMA_PROG_ERROR;
+    }
+
+    let state = &mut *state_ptr(strm);
+    let CoderInterface::Registered(next) = state.next else {
+        return LZMA_PROG_ERROR;
+    };
+
+    let Some(update) = next.update else {
+        return LZMA_PROG_ERROR;
+    };
+
+    update(next.coder, (*strm).allocator, filters)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
@@ -503,6 +529,7 @@ mod tests {
             get_progress: Some(test_progress),
             get_check: None,
             memconfig: Some(test_memconfig),
+            update: None,
         };
         assert_eq!(
             install_next_coder(strm, next, all_supported_actions()),

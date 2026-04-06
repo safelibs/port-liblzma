@@ -225,6 +225,7 @@ pub(crate) unsafe fn auto_decoder(strm: *mut lzma_stream, memlimit: u64, flags: 
             get_progress: None,
             get_check: Some(auto_decoder_get_check),
             memconfig: Some(auto_decoder_memconfig),
+            update: None,
         },
         auto_decoder_actions(),
     )

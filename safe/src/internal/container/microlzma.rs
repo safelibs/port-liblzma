@@ -2,7 +2,10 @@ use core::ffi::c_void;
 use core::ptr;
 use std::io::{Cursor, Read, Write};
 
-use crate::ffi::types::{lzma_action, lzma_allocator, lzma_bool, lzma_options_lzma, lzma_ret, lzma_stream, LZMA_BUF_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END};
+use crate::ffi::types::{
+    lzma_action, lzma_allocator, lzma_bool, lzma_options_lzma, lzma_ret, lzma_stream,
+    LZMA_BUF_ERROR, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
+};
 use crate::internal::common::{all_supported_actions, LZMA_FINISH};
 use crate::internal::filter::common::LZMA_FILTER_LZMA1;
 use crate::internal::lzma::{io_error_to_ret, parse_filters, TerminalFilter};
@@ -26,9 +29,19 @@ struct MicroDecoder {
     decoded: bool,
 }
 
-unsafe fn copy_output(output_buf: &[u8], output_pos_state: &mut usize, output: *mut u8, out_pos: *mut usize, out_size: usize) -> lzma_ret {
+unsafe fn copy_output(
+    output_buf: &[u8],
+    output_pos_state: &mut usize,
+    output: *mut u8,
+    out_pos: *mut usize,
+    out_size: usize,
+) -> lzma_ret {
     let copy_size = (output_buf.len() - *output_pos_state).min(out_size - *out_pos);
-    ptr::copy_nonoverlapping(output_buf.as_ptr().add(*output_pos_state), output.add(*out_pos), copy_size);
+    ptr::copy_nonoverlapping(
+        output_buf.as_ptr().add(*output_pos_state),
+        output.add(*out_pos),
+        copy_size,
+    );
     *output_pos_state += copy_size;
     *out_pos += copy_size;
     if *output_pos_state == output_buf.len() {
@@ -51,7 +64,13 @@ unsafe fn microlzma_encoder_code(
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<MicroEncoder>();
     if coder.output_pos < coder.output.len() {
-        return copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size);
+        return copy_output(
+            &coder.output,
+            &mut coder.output_pos,
+            output,
+            out_pos,
+            out_size,
+        );
     }
 
     if action == LZMA_FINISH && out_size - *out_pos < 6 {
@@ -59,7 +78,9 @@ unsafe fn microlzma_encoder_code(
     }
 
     if in_size != 0 {
-        coder.input.extend_from_slice(core::slice::from_raw_parts(input, in_size));
+        coder
+            .input
+            .extend_from_slice(core::slice::from_raw_parts(input, in_size));
         *in_pos = in_size;
     }
 
@@ -103,7 +124,13 @@ unsafe fn microlzma_encoder_code(
     }
     coder.output[0] = !rust_options.get_props();
     coder.output_pos = 0;
-    copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size)
+    copy_output(
+        &coder.output,
+        &mut coder.output_pos,
+        output,
+        out_pos,
+        out_size,
+    )
 }
 
 unsafe fn microlzma_decoder_code(
@@ -119,11 +146,19 @@ unsafe fn microlzma_decoder_code(
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<MicroDecoder>();
     if coder.output_pos < coder.output.len() {
-        return copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size);
+        return copy_output(
+            &coder.output,
+            &mut coder.output_pos,
+            output,
+            out_pos,
+            out_size,
+        );
     }
 
     if in_size != 0 {
-        coder.input.extend_from_slice(core::slice::from_raw_parts(input, in_size));
+        coder
+            .input
+            .extend_from_slice(core::slice::from_raw_parts(input, in_size));
         *in_pos = in_size;
     }
 
@@ -168,9 +203,11 @@ unsafe fn microlzma_decoder_code(
 
         reader.into_inner().position()
     } else {
-        let max_guess = coder
-            .uncomp_size
-            .saturating_add(u64::from(coder.dict_size).max(coder.comp_size.saturating_mul(256)).max(64));
+        let max_guess = coder.uncomp_size.saturating_add(
+            u64::from(coder.dict_size)
+                .max(coder.comp_size.saturating_mul(256))
+                .max(64),
+        );
         let mut guess = coder.uncomp_size;
 
         loop {
@@ -225,7 +262,13 @@ unsafe fn microlzma_decoder_code(
 
     coder.decoded = true;
     coder.output_pos = 0;
-    copy_output(&coder.output, &mut coder.output_pos, output, out_pos, out_size)
+    copy_output(
+        &coder.output,
+        &mut coder.output_pos,
+        output,
+        out_pos,
+        out_size,
+    )
 }
 
 unsafe fn micro_encoder_end(coder: *mut c_void, _allocator: *const lzma_allocator) {
@@ -236,7 +279,10 @@ unsafe fn micro_decoder_end(coder: *mut c_void, _allocator: *const lzma_allocato
     drop(Box::from_raw(coder.cast::<MicroDecoder>()));
 }
 
-pub(crate) unsafe fn microlzma_encoder(strm: *mut lzma_stream, options: *const lzma_options_lzma) -> lzma_ret {
+pub(crate) unsafe fn microlzma_encoder(
+    strm: *mut lzma_stream,
+    options: *const lzma_options_lzma,
+) -> lzma_ret {
     if strm.is_null() || options.is_null() {
         return LZMA_PROG_ERROR;
     }
@@ -256,6 +302,7 @@ pub(crate) unsafe fn microlzma_encoder(strm: *mut lzma_stream, options: *const l
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         all_supported_actions(),
     )
@@ -291,6 +338,7 @@ pub(crate) unsafe fn microlzma_decoder(
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         all_supported_actions(),
     )

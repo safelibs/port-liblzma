@@ -146,6 +146,7 @@ pub(crate) unsafe fn index_encoder(strm: *mut lzma_stream, index: *const lzma_in
         get_progress: None,
         get_check: None,
         memconfig: None,
+        update: None,
     };
 
     let ret = install_next_coder(strm, next, encoder_supported_actions());

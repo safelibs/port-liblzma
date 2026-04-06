@@ -581,6 +581,7 @@ pub(crate) unsafe fn file_info_decoder(
         get_progress: None,
         get_check: None,
         memconfig: Some(file_info_memconfig),
+        update: None,
     };
 
     let ret = install_next_coder(strm, next, file_info_supported_actions());

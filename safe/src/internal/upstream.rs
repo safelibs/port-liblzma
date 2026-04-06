@@ -42,9 +42,9 @@ const STREAM_DECODER_SUPPORTED_FLAGS: u32 = LZMA_TELL_NO_CHECK
 const LZMA_THREADS_MAX: u32 = 16384;
 
 #[derive(Clone, Copy)]
-struct IndexRecord {
-    unpadded_size: u64,
-    uncompressed_size: u64,
+pub(crate) struct IndexRecord {
+    pub(crate) unpadded_size: u64,
+    pub(crate) uncompressed_size: u64,
 }
 
 struct RawCoder {
@@ -118,7 +118,7 @@ struct StreamDecoderCoder {
     decoded: bool,
 }
 
-unsafe fn copy_filters(
+pub(crate) unsafe fn copy_filters(
     src: *const lzma_filter,
 ) -> Result<[lzma_filter; crate::ffi::types::LZMA_FILTERS_MAX + 1], lzma_ret> {
     let mut dest = [lzma_filter {
@@ -133,7 +133,9 @@ unsafe fn copy_filters(
     Ok(dest)
 }
 
-unsafe fn free_filters(filters: &mut [lzma_filter; crate::ffi::types::LZMA_FILTERS_MAX + 1]) {
+pub(crate) unsafe fn free_filters(
+    filters: &mut [lzma_filter; crate::ffi::types::LZMA_FILTERS_MAX + 1],
+) {
     filter::filters_free_impl(filters.as_mut_ptr(), ptr::null());
 }
 
@@ -518,13 +520,13 @@ fn append_vli(output: &mut Vec<u8>, value: u64) {
     output.extend_from_slice(&temp[..pos]);
 }
 
-fn write_xz_stream_header(check: lzma_check, output: &mut Vec<u8>) {
+pub(crate) fn write_xz_stream_header(check: lzma_check, output: &mut Vec<u8>) {
     output.extend_from_slice(&[0xFD, b'7', b'z', b'X', b'Z', 0x00, 0x00, check as u8]);
     let crc = check::crc32::crc32(&output[6..8], 0);
     output.extend_from_slice(&crc.to_le_bytes());
 }
 
-fn write_xz_stream_footer(check: lzma_check, backward_size: u32, output: &mut Vec<u8>) {
+pub(crate) fn write_xz_stream_footer(check: lzma_check, backward_size: u32, output: &mut Vec<u8>) {
     let mut footer = Vec::with_capacity(12);
     footer.extend_from_slice(&backward_size.to_le_bytes());
     footer.extend_from_slice(&[0, check as u8]);
@@ -534,7 +536,7 @@ fn write_xz_stream_footer(check: lzma_check, backward_size: u32, output: &mut Ve
     output.extend_from_slice(b"YZ");
 }
 
-fn encode_xz_index(records: &[IndexRecord]) -> Vec<u8> {
+pub(crate) fn encode_xz_index(records: &[IndexRecord]) -> Vec<u8> {
     let mut output = Vec::new();
     output.push(0x00);
     append_vli(&mut output, records.len() as u64);
@@ -1657,6 +1659,7 @@ pub(crate) unsafe fn raw_encoder(strm: *mut lzma_stream, filters: *const lzma_fi
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         raw_encoder_actions(),
     )
@@ -1705,6 +1708,7 @@ pub(crate) unsafe fn raw_decoder(strm: *mut lzma_stream, filters: *const lzma_fi
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         raw_decoder_actions(),
     )
@@ -1839,6 +1843,7 @@ pub(crate) unsafe fn stream_encoder(
             get_progress: None,
             get_check: Some(stream_get_check),
             memconfig: None,
+            update: None,
         },
         all_supported_actions(),
     )
@@ -1872,6 +1877,7 @@ pub(crate) unsafe fn stream_decoder(strm: *mut lzma_stream, memlimit: u64, flags
             get_progress: None,
             get_check: Some(stream_decoder_get_check),
             memconfig: Some(stream_decoder_memconfig),
+            update: None,
         },
         all_supported_actions(),
     )

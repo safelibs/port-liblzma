@@ -479,6 +479,7 @@ pub(crate) unsafe fn lzip_decoder(strm: *mut lzma_stream, memlimit: u64, flags: 
             get_progress: None,
             get_check: Some(lzip_get_check),
             memconfig: Some(lzip_memconfig),
+            update: None,
         },
         all_supported_actions(),
     )

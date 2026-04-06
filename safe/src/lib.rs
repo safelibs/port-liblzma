@@ -27,6 +27,8 @@ mod internal {
 pub use ffi::types::*;
 
 #[cfg(all(liblzma_linux, target_family = "unix"))]
+// Keep the legacy Linux symbol-version aliases attached to the finalized Rust
+// exports, including the multithreaded stream entry points.
 core::arch::global_asm!(include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/abi/linux_symver_aliases.S"

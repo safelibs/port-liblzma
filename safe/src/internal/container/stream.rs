@@ -3,7 +3,7 @@ use core::ptr;
 use crate::ffi::types::{
     lzma_check, lzma_filter, lzma_ret, lzma_stream, LZMA_OK, LZMA_PROG_ERROR, LZMA_STREAM_END,
 };
-use crate::internal::upstream;
+use crate::internal::{stream_state, upstream};
 
 pub(crate) const LZMA_TELL_NO_CHECK: u32 = 0x01;
 pub(crate) const LZMA_TELL_UNSUPPORTED_CHECK: u32 = 0x02;
@@ -60,5 +60,10 @@ pub(crate) unsafe fn filters_update(
         return LZMA_PROG_ERROR;
     }
 
-    upstream::filters_update(strm, filters)
+    let ret = stream_state::lzma_filters_update_impl(strm, filters);
+    if ret == LZMA_PROG_ERROR {
+        return upstream::filters_update(strm, filters);
+    }
+
+    ret
 }

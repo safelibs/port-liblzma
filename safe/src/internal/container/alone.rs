@@ -275,6 +275,7 @@ pub(crate) unsafe fn alone_encoder(
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         all_supported_actions(),
     )
@@ -302,6 +303,7 @@ pub(crate) unsafe fn alone_decoder(strm: *mut lzma_stream, memlimit: u64) -> lzm
             get_progress: None,
             get_check: None,
             memconfig: Some(alone_decoder_memconfig),
+            update: None,
         },
         all_supported_actions(),
     )

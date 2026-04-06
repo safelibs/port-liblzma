@@ -2,12 +2,14 @@ use core::{ffi::c_void, mem, ptr};
 
 use crate::ffi::types::{
     lzma_action, lzma_allocator, lzma_block, lzma_ret, lzma_stream, LZMA_DATA_ERROR, LZMA_OK,
-    LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_UNSUPPORTED_CHECK, LZMA_VLI_UNKNOWN,
-    LZMA_STREAM_INIT,
+    LZMA_OPTIONS_ERROR, LZMA_PROG_ERROR, LZMA_STREAM_END, LZMA_STREAM_INIT, LZMA_UNSUPPORTED_CHECK,
+    LZMA_VLI_UNKNOWN,
 };
 use crate::internal::{
     check::{self, CheckState},
-    common::{ACTION_COUNT, LZMA_CHECK_ID_MAX, LZMA_FINISH, LZMA_RUN, LZMA_SYNC_FLUSH, LZMA_VLI_MAX},
+    common::{
+        ACTION_COUNT, LZMA_CHECK_ID_MAX, LZMA_FINISH, LZMA_RUN, LZMA_SYNC_FLUSH, LZMA_VLI_MAX,
+    },
     stream_state::{install_next_coder, lzma_code_impl, lzma_end_impl, NextCoder},
     upstream,
 };
@@ -204,8 +206,8 @@ unsafe fn block_decode(
         BlockSequence::Code => {
             let in_remaining = in_size - *in_pos;
             let out_remaining = out_size - *out_pos;
-            let in_limit = (state.compressed_limit - state.compressed_size)
-                .min(in_remaining as u64) as usize;
+            let in_limit =
+                (state.compressed_limit - state.compressed_size).min(in_remaining as u64) as usize;
             let out_limit = (state.uncompressed_limit - state.uncompressed_size)
                 .min(out_remaining as u64) as usize;
 
@@ -311,7 +313,8 @@ unsafe fn block_decode(
                 return LZMA_OK;
             }
 
-            if state.verify_check && block.raw_check[..check_size] != state.check_buf[..check_size] {
+            if state.verify_check && block.raw_check[..check_size] != state.check_buf[..check_size]
+            {
                 return LZMA_DATA_ERROR;
             }
 
@@ -334,8 +337,12 @@ unsafe fn block_code(
 ) -> lzma_ret {
     let coder = &mut *coder.cast::<BlockCoder>();
     match coder.state {
-        BlockCoderState::Encoder(_) => block_encode(coder, input, in_pos, in_size, output, out_pos, out_size, action),
-        BlockCoderState::Decoder(_) => block_decode(coder, input, in_pos, in_size, output, out_pos, out_size, action),
+        BlockCoderState::Encoder(_) => block_encode(
+            coder, input, in_pos, in_size, output, out_pos, out_size, action,
+        ),
+        BlockCoderState::Decoder(_) => block_decode(
+            coder, input, in_pos, in_size, output, out_pos, out_size, action,
+        ),
     }
 }
 
@@ -347,7 +354,10 @@ unsafe fn block_end(coder: *mut c_void, _allocator: *const lzma_allocator) {
     }
 }
 
-unsafe fn make_encoder_coder(allocator: *const lzma_allocator, block: *mut lzma_block) -> Result<BlockCoder, lzma_ret> {
+unsafe fn make_encoder_coder(
+    allocator: *const lzma_allocator,
+    block: *mut lzma_block,
+) -> Result<BlockCoder, lzma_ret> {
     if (*block).version > 1 {
         return Err(LZMA_OPTIONS_ERROR);
     }
@@ -379,8 +389,13 @@ unsafe fn make_encoder_coder(allocator: *const lzma_allocator, block: *mut lzma_
     })
 }
 
-unsafe fn make_decoder_coder(allocator: *const lzma_allocator, block: *mut lzma_block) -> Result<BlockCoder, lzma_ret> {
-    if super::header::block_unpadded_size(block.cast_const()) == 0 || !vli_is_valid((*block).uncompressed_size) {
+unsafe fn make_decoder_coder(
+    allocator: *const lzma_allocator,
+    block: *mut lzma_block,
+) -> Result<BlockCoder, lzma_ret> {
+    if super::header::block_unpadded_size(block.cast_const()) == 0
+        || !vli_is_valid((*block).uncompressed_size)
+    {
         return Err(LZMA_PROG_ERROR);
     }
 
@@ -427,7 +442,11 @@ unsafe fn make_decoder_coder(allocator: *const lzma_allocator, block: *mut lzma_
     })
 }
 
-unsafe fn install_block_coder(strm: *mut lzma_stream, block: *mut lzma_block, encode: bool) -> lzma_ret {
+unsafe fn install_block_coder(
+    strm: *mut lzma_stream,
+    block: *mut lzma_block,
+    encode: bool,
+) -> lzma_ret {
     if strm.is_null() || block.is_null() {
         return LZMA_PROG_ERROR;
     }
@@ -452,6 +471,7 @@ unsafe fn install_block_coder(strm: *mut lzma_stream, block: *mut lzma_block, en
             get_progress: None,
             get_check: None,
             memconfig: None,
+            update: None,
         },
         if encode {
             block_encoder_actions()

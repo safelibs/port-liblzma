@@ -832,13 +832,13 @@ pub unsafe extern "C" fn lzma_stream_encoder_mt(
     arg0: *mut lzma_stream,
     arg1: *const lzma_mt,
 ) -> lzma_ret {
-    LZMA_OPTIONS_ERROR
+    container::stream_encoder_mt::stream_encoder_mt(arg0, arg1)
 }
 
 #[no_mangle]
 #[allow(unused_variables)]
 pub unsafe extern "C" fn lzma_stream_encoder_mt_memusage(arg0: *const lzma_mt) -> u64 {
-    u64::MAX
+    container::stream_encoder_mt::stream_encoder_mt_memusage(arg0)
 }
 
 #[no_mangle]
@@ -895,7 +895,7 @@ pub unsafe extern "C" fn lzma_stream_decoder_mt(
     arg0: *mut lzma_stream,
     arg1: *const lzma_mt,
 ) -> lzma_ret {
-    upstream::stream_decoder_mt(arg0, arg1)
+    container::stream_decoder_mt::stream_decoder_mt(arg0, arg1)
 }
 
 #[no_mangle]

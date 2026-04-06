@@ -3,5 +3,8 @@ pub(crate) mod auto;
 pub(crate) mod easy;
 pub(crate) mod lzip;
 pub(crate) mod microlzma;
+pub(crate) mod outqueue;
 pub(crate) mod stream;
 pub(crate) mod stream_buffer;
+pub(crate) mod stream_decoder_mt;
+pub(crate) mod stream_encoder_mt;

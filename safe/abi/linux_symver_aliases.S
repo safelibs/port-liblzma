@@ -1,5 +1,9 @@
     .text
 
+    # Bind the duplicate Linux symbol-version entries to the final Rust
+    # definitions exported from the shared library. lzma_stream_decoder_mt is
+    # versioned only through the linker map, so it doesn't need an extra alias.
+
     .globl __symver_lzma_stream_encoder_mt_XZ_5_1_2alpha
     .set __symver_lzma_stream_encoder_mt_XZ_5_1_2alpha, lzma_stream_encoder_mt
     .symver __symver_lzma_stream_encoder_mt_XZ_5_1_2alpha, lzma_stream_encoder_mt@XZ_5.1.2alpha
