@@ -58,6 +58,15 @@ assert_threaded_progress_visible(lzma_stream *strm)
 
 
 static void
+test_stream_encoder_mt_rejects_null_options(void)
+{
+	lzma_stream enc = LZMA_STREAM_INIT;
+	assert_lzma_ret(lzma_stream_encoder_mt(&enc, NULL), LZMA_PROG_ERROR);
+	assert_uint_eq(lzma_stream_encoder_mt_memusage(NULL), UINT64_MAX);
+}
+
+
+static void
 test_stream_encoder_mt_memusage_and_timeout_progress(void)
 {
 #if !TUKTEST_THREADS_ENABLED
@@ -109,6 +118,7 @@ main(int argc, char **argv)
 {
 	tuktest_start(argc, argv);
 
+	tuktest_run(test_stream_encoder_mt_rejects_null_options);
 	tuktest_run(test_stream_encoder_mt_memusage_and_timeout_progress);
 
 	return tuktest_end();

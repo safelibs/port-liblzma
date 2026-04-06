@@ -587,7 +587,10 @@ impl StreamEncoderMt {
         allocator: *const lzma_allocator,
         options: *const lzma_mt,
     ) -> Result<Box<Self>, lzma_ret> {
-        let options_ref = &*options;
+        let options_ref = match options.as_ref() {
+            Some(options_ref) => options_ref,
+            None => return Err(LZMA_PROG_ERROR),
+        };
         let (filters, block_size, outbuf_alloc_size, check_id) = get_options(options)?;
 
         let mut header = [0u8; LZMA_STREAM_HEADER_SIZE];
@@ -1236,5 +1239,13 @@ mod tests {
     #[test]
     fn filter_update_after_flush_round_trips() {
         unsafe { filter_update_round_trips(LZMA_FULL_FLUSH) }
+    }
+
+    #[test]
+    fn stream_encoder_mt_rejects_null_options() {
+        unsafe {
+            let mut enc = LZMA_STREAM_INIT;
+            assert_eq!(stream_encoder_mt(&mut enc, ptr::null()), LZMA_PROG_ERROR);
+        }
     }
 }
