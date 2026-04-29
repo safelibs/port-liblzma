@@ -1,0 +1,5 @@
+*.sh text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.env text eol=lf
+.github/workflows/*.yml text eol=lf
