@@ -94,29 +94,49 @@ Hard failures: missing `dist/*.deb`, no canonical packages matched, mismatch bet
 
 ## Repository Layout
 
-Required directories: `original/`, `safe/`, `packaging/`, `docs/`, `tests/upstream/`, `tests/port/`, `scripts/`.
+Required directories: `original/`, `safe/`, `packaging/`, `tests/upstream/`, `tests/port/`, `scripts/`.
 
-Required files: `.github/workflows/ci-release.yml`, `.gitattributes`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `all_cves.json`, `dependents.json`, `relevant_cves.json`, `docs/PORTING.md`, `docs/PUBLISHING.md`, `packaging/package.env`.
+Required files: `.github/workflows/ci-release.yml`, `.gitattributes`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `all_cves.json`, `dependents.json`, `relevant_cves.json`, `packaging/package.env`.
 
 Required executable scripts: `scripts/build-debs.sh`, `scripts/check-layout.sh`, `scripts/install-build-deps.sh`, `scripts/run-port-tests.sh`, `scripts/run-tests.sh`, `scripts/run-upstream-tests.sh`, `scripts/run-validation-tests.sh`.
 
 `scripts/check-layout.sh` is the source of truth for the layout. When you change required files or scripts, update it in the same commit.
 
+`docs/` (with the template's `PORTING.md` and `PUBLISHING.md` meta-guides) is intentionally **not** required of port repos — those documents describe how to *create* a port from the template and have no role inside an already-created port.
+
 ## `packaging/package.env`
 
-The reference build script consumes this file. Required fields:
+The only field every port must set:
 
-- `SAFELIBS_LIBRARY` — validator manifest identifier and `safelibs/port-<library>` suffix.
-- `DEB_PACKAGE`, `DEB_VERSION`, `DEB_ARCHITECTURE`, `DEB_MAINTAINER`, `DEB_SECTION`, `DEB_PRIORITY`, `DEB_DESCRIPTION`, `DEB_INSTALL_PREFIX`, `DEB_DEPENDS` — Debian package metadata.
+- `SAFELIBS_LIBRARY` — validator manifest identifier; must equal the repo name suffix (`safelibs/port-<SAFELIBS_LIBRARY>`).
 
-Ports that override `build-debs.sh` may leave the `DEB_*` fields at their template defaults but must still set a real `SAFELIBS_LIBRARY` for the validator hook.
+The template's reference `scripts/build-debs.sh` *also* consumes a set of `DEB_*` fields (`DEB_PACKAGE`, `DEB_VERSION`, `DEB_ARCHITECTURE`, `DEB_MAINTAINER`, `DEB_SECTION`, `DEB_PRIORITY`, `DEB_DESCRIPTION`, `DEB_INSTALL_PREFIX`, `DEB_DEPENDS`) for its self-contained payload-copy build. Real ports override `build-debs.sh` (typically with `dpkg-buildpackage` rooted in `safe/debian/`) and can drop the `DEB_*` fields from `packaging/package.env` entirely.
+
+## `scripts/lib/build-deb-common.sh`
+
+A small bash library that ports overriding `build-debs.sh` may source. It provides:
+
+- `prepare_rust_env` — source `~/.cargo/env`, prepend `~/.cargo/bin` to `PATH`.
+- `prepare_dist_dir` — recreate `<repo>/dist` empty.
+- `stamp_safelibs_changelog` — rewrite `debian/changelog` to version `<upstream>+safelibs<commit-epoch>`. Honors `SAFELIBS_COMMIT_SHA` when CI sets it.
+- `build_with_dpkg_buildpackage` — run `mk-build-deps -i` + `dpkg-buildpackage -us -uc -b` and copy `../*.deb` into `<repo>/dist`.
+
+Most port `build-debs.sh` scripts collapse to ~15 lines after sourcing this helper.
+
+## Toolchain auto-detection
+
+The template's default `scripts/install-build-deps.sh` reads `safe/rust-toolchain.toml`. When a `[toolchain] channel = "X"` line is present, X is installed as the rustup default for the build step. With no toolchain file, the script installs `stable`. Set `SAFELIBS_RUST_TOOLCHAIN` in the environment to override the file.
+
+## Host-path lint
+
+`scripts/check-layout.sh` scans `.cargo/config.toml`, `safe/.cargo/config.toml`, `safe/debian/rules`, `safe/Cargo.toml`, and every shell/TOML/JSON/Makefile under `safe/tools/` for hardcoded `/home/<user>/safelibs/port-*` paths that leak from local development. CI fails before the build step if any are found.
 
 ## When To Edit What
 
 - **Adding/changing a port-specific build step:** edit the relevant hook script in your port repo. Do not edit the workflow file.
 - **Changing the workflow shape (new step order, new global env, new artifact policy):** edit the template's `.github/workflows/ci-release.yml` and the corresponding section in this file. Sync changes back into `safelibs/port-*` repos by hand or by re-templating.
 - **Adding a new required file or directory:** update `scripts/check-layout.sh`, this file, and `README.md` in the same commit.
-- **Renaming a hook script:** update `scripts/check-layout.sh`, `.github/workflows/ci-release.yml`, this file, `README.md`, `docs/PORTING.md`, and `docs/PUBLISHING.md` in the same commit.
+- **Renaming a hook script:** update `scripts/check-layout.sh`, `.github/workflows/ci-release.yml`, this file, and `README.md` in the same commit.
 
 ## Non-Goals
 
