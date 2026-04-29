@@ -176,7 +176,7 @@ def main() -> int:
                 "library": library,
                 "repository": f"safelibs/port-{library}",
                 "url": f"https://github.com/safelibs/port-{library}",
-                "tag_ref": f"refs/tags/{library}/04-test",
+                "tag_ref": f"refs/tags/build-{commit_sha[:12]}",
                 "commit": commit_sha,
                 "release_tag": f"build-{commit_sha[:12]}",
                 "debs": ordered_debs,
