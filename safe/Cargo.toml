@@ -7,7 +7,7 @@ build = "build.rs"
 
 [lib]
 name = "lzma"
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 libc = "0.2"
