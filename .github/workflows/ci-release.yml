@@ -83,54 +83,54 @@ jobs:
         id: artifact
         run: |
           set -euo pipefail
-          shopt -s nullglob
           mapfile -t debs < <(find dist -type f -name '*.deb' -print | sort)
           if (( ${#debs[@]} == 0 )); then
             printf 'No .deb files were produced under dist/.\n' >&2
             exit 1
           fi
+          mapfile -t all_files < <(find dist -type f -print | sort)
           {
-            printf 'count=%d\n' "${#debs[@]}"
+            printf 'count=%d\n' "${#all_files[@]}"
             printf 'paths<<EOF\n'
-            printf '%s\n' "${debs[@]}"
+            printf '%s\n' "${all_files[@]}"
             printf 'EOF\n'
           } >> "$GITHUB_OUTPUT"
-          printf 'Built %d .deb file(s):\n' "${#debs[@]}"
-          printf '  %s\n' "${debs[@]}"
+          printf 'Built %d artifact(s) (%d .deb):\n' "${#all_files[@]}" "${#debs[@]}"
+          printf '  %s\n' "${all_files[@]}"
 
       - name: Upload Debian artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: debs-${{ github.run_id }}
-          path: dist/*.deb
+          path: dist/*
           if-no-files-found: error
 
       - name: Publish build release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          DEB_PATHS: ${{ steps.artifact.outputs.paths }}
+          ARTIFACT_PATHS: ${{ steps.artifact.outputs.paths }}
         run: |
           set -euo pipefail
 
           short_sha="${GITHUB_SHA:0:12}"
           tag="build-${short_sha}"
 
-          mapfile -t deb_files <<< "$DEB_PATHS"
+          mapfile -t artifact_files <<< "$ARTIFACT_PATHS"
 
           notes_file="$(mktemp)"
           {
             printf 'Commit SHA: %s\n\n' "$GITHUB_SHA"
-            printf 'Attached .deb file(s) were produced by `scripts/build-debs.sh`.\n'
+            printf 'Attached binary (.deb) and source (.dsc, .tar.*, .changes, .buildinfo) artifacts were produced by `scripts/build-debs.sh`.\n'
           } > "$notes_file"
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" "${deb_files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$tag" "${artifact_files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$tag" "${deb_files[@]}" \
+            gh release create "$tag" "${artifact_files[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "Safe library debs for ${short_sha}" \
+              --title "Safe library build for ${short_sha}" \
               --notes-file "$notes_file"
           fi
 
