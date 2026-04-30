@@ -11,10 +11,9 @@
 #                          run in a directory containing debian/changelog.
 #                          Honors $SAFELIBS_COMMIT_SHA when set.
 #   build_with_dpkg_buildpackage
-#                          Run mk-build-deps + dpkg-buildpackage -us -uc in
-#                          the current directory (full build: source + binary)
-#                          and copy the resulting .deb / .dsc / .tar.* /
-#                          .buildinfo / .changes files into $repo_root/dist.
+#                          Run mk-build-deps + dpkg-buildpackage -us -uc -b
+#                          (binary-only) in the current directory and copy
+#                          the resulting .deb files into $repo_root/dist.
 
 prepare_rust_env() {
   if [[ -f "$HOME/.cargo/env" ]]; then
@@ -77,56 +76,9 @@ stamp_safelibs_changelog() {
   mv debian/changelog.new debian/changelog
 }
 
-_synthesize_orig_tarball_if_needed() {
-  # SafeLibs ports don't carry an upstream orig.tar (the safe/ tree IS the
-  # source). For 3.0 (quilt) packages, dpkg-source -b refuses to build
-  # without one, so synthesize a deterministic orig.tar.xz from the safe/
-  # tree (excluding debian/ and build artifacts).
-  [[ -f debian/source/format ]] || return 0
-  grep -Fq '3.0 (quilt)' debian/source/format || return 0
-
-  local package upstream_version orig_tar
-  package="$(dpkg-parsechangelog -S Source)"
-  upstream_version="$(dpkg-parsechangelog -S Version | sed -E 's/-[^-]*$//')"
-  orig_tar="../${package}_${upstream_version}.orig.tar.xz"
-
-  [[ -f "$orig_tar" ]] && return 0
-
-  local stage
-  stage="$(mktemp -d)"
-  rsync -a \
-    --exclude='/debian' \
-    --exclude='/target' \
-    --exclude='/build' \
-    --exclude='/build-check' \
-    --exclude='/build-check-install' \
-    --exclude='/.git' \
-    ./ "$stage/${package}-${upstream_version}/"
-  tar --create --xz --file="$orig_tar" \
-    --sort=name --owner=0 --group=0 --numeric-owner \
-    --mtime='@0' \
-    -C "$stage" "${package}-${upstream_version}"
-  rm -rf "$stage"
-}
-
 build_with_dpkg_buildpackage() {
   local repo_root="$1"
   sudo mk-build-deps -i -r -t "apt-get -y --no-install-recommends" debian/control
-  _synthesize_orig_tarball_if_needed
-  dpkg-buildpackage -us -uc
-  shopt -s nullglob
-  local artifacts=(
-    ../*.deb
-    ../*.ddeb
-    ../*.dsc
-    ../*.tar.gz ../*.tar.xz ../*.tar.bz2 ../*.tar.zst
-    ../*.buildinfo
-    ../*.changes
-  )
-  shopt -u nullglob
-  if (( ${#artifacts[@]} == 0 )); then
-    printf 'build_with_dpkg_buildpackage: dpkg-buildpackage produced no artifacts\n' >&2
-    return 1
-  fi
-  cp -v "${artifacts[@]}" "$repo_root/dist"/
+  dpkg-buildpackage -us -uc -b
+  cp -v ../*.deb "$repo_root/dist"/
 }
