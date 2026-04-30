@@ -11,9 +11,10 @@
 #                          run in a directory containing debian/changelog.
 #                          Honors $SAFELIBS_COMMIT_SHA when set.
 #   build_with_dpkg_buildpackage
-#                          Run mk-build-deps + dpkg-buildpackage -us -uc -b in
-#                          the current directory and copy ../*.deb into
-#                          $repo_root/dist.
+#                          Run mk-build-deps + dpkg-buildpackage -us -uc in
+#                          the current directory (full build: source + binary)
+#                          and copy the resulting .deb / .dsc / .tar.* /
+#                          .buildinfo / .changes files into $repo_root/dist.
 
 prepare_rust_env() {
   if [[ -f "$HOME/.cargo/env" ]]; then
@@ -79,6 +80,20 @@ stamp_safelibs_changelog() {
 build_with_dpkg_buildpackage() {
   local repo_root="$1"
   sudo mk-build-deps -i -r -t "apt-get -y --no-install-recommends" debian/control
-  dpkg-buildpackage -us -uc -b
-  cp -v ../*.deb "$repo_root/dist"/
+  dpkg-buildpackage -us -uc
+  shopt -s nullglob
+  local artifacts=(
+    ../*.deb
+    ../*.ddeb
+    ../*.dsc
+    ../*.tar.gz ../*.tar.xz ../*.tar.bz2 ../*.tar.zst
+    ../*.buildinfo
+    ../*.changes
+  )
+  shopt -u nullglob
+  if (( ${#artifacts[@]} == 0 )); then
+    printf 'build_with_dpkg_buildpackage: dpkg-buildpackage produced no artifacts\n' >&2
+    return 1
+  fi
+  cp -v "${artifacts[@]}" "$repo_root/dist"/
 }
