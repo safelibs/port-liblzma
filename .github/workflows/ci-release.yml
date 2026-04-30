@@ -75,6 +75,7 @@ jobs:
         run: bash scripts/run-port-tests.sh
 
       - name: Run validation tests
+        timeout-minutes: 30
         env:
           SAFELIBS_COMMIT_SHA: ${{ github.sha }}
         run: bash scripts/run-validation-tests.sh
