@@ -19,7 +19,7 @@ The current shape moves the divergence into hook scripts under `scripts/`. The w
 | 3 | Build .deb artifacts | `scripts/build-debs.sh` | Reference build from `packaging/package.env` + `safe/` |
 | 4 | Run upstream tests | `scripts/run-upstream-tests.sh` | Run every `*.sh` under `tests/upstream/` |
 | 5 | Run port tests | `scripts/run-port-tests.sh` | Run every `*.sh` under `tests/port/` |
-| 6 | Run validation tests | `scripts/run-validation-tests.sh` | Clone `safelibs/validator`, run `port-04-test` mode against `dist/*.deb` |
+| 6 | Run validation tests | `scripts/run-validation-tests.sh` | Clone `safelibs/validator`, run `port` mode against `dist/*.deb` |
 | 7 | Upload `dist/*.deb` | (workflow) | One GitHub Actions artifact per run |
 | 8 | Publish release | (workflow) | `build-<short-sha>` GitHub Release with every `dist/*.deb` |
 
@@ -65,7 +65,7 @@ Run port-authored tests for the safe implementation: unit tests, ABI checks, fuz
 
 ### `scripts/run-validation-tests.sh`
 
-Run the [safelibs/validator](https://github.com/safelibs/validator) test matrix in `port-04-test` mode against `dist/*.deb`.
+Run the [safelibs/validator](https://github.com/safelibs/validator) test matrix in `port` mode against `dist/*.deb`.
 
 Inputs (mostly read from `packaging/package.env`):
 
@@ -84,9 +84,9 @@ Behavior:
 
 1. Reads canonical `apt_packages` for `SAFELIBS_LIBRARY` from the validator manifest.
 2. Inspects every `dist/*.deb`, matching them by `dpkg-deb --field Package` against the canonical list. Non-canonical extras are ignored. Canonical packages with no matching deb become `unported_original_packages`.
-3. Synthesizes a `port-04-test` deb lock JSON file with the matching debs, sha256s, sizes, and the synthesized `release_tag = build-<commit[:12]>`.
+3. Synthesizes a `port` deb lock JSON file with the matching debs, sha256s, sizes, and the synthesized `release_tag = build-<commit[:12]>`.
 4. Lays out `<override-deb-root>/<library>/<filename>.deb`.
-5. Invokes `bash <validator>/test.sh --library <SAFELIBS_LIBRARY> --mode port-04-test --override-deb-root ... --port-deb-lock ... --artifact-root ...`.
+5. Invokes `bash <validator>/test.sh --library <SAFELIBS_LIBRARY> --mode port --override-deb-root ... --port-deb-lock ... --artifact-root ...`.
 
 Soft skip: a library that has no entry in the validator manifest (the template itself, ports still being authored) returns a skip and the script exits 0. This is the only acceptable success without a real validator run.
 

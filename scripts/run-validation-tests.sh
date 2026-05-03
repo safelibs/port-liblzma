@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the safelibs/validator test matrix in port-04-test mode against the
+# Run the safelibs/validator test matrix in port mode against the
 # .deb files this repository just built into dist/.
 #
 # Inputs:
@@ -88,7 +88,7 @@ lock_path="$work_dir/port-deb-lock.json"
 artifact_root="$work_dir/artifacts"
 mkdir -p -- "$override_root" "$artifact_root"
 
-note "synthesizing port-04-test lock for $SAFELIBS_LIBRARY at commit ${commit_sha:0:12}"
+note "synthesizing port lock for $SAFELIBS_LIBRARY at commit ${commit_sha:0:12}"
 build_status=0
 SAFELIBS_LIBRARY="$SAFELIBS_LIBRARY" \
 SAFELIBS_COMMIT_SHA="$commit_sha" \
@@ -113,7 +113,7 @@ fi
 note "running validator matrix for $SAFELIBS_LIBRARY"
 bash "$validator_dir/test.sh" \
   --library "$SAFELIBS_LIBRARY" \
-  --mode port-04-test \
+  --mode port \
   --override-deb-root "$override_root" \
   --port-deb-lock "$lock_path" \
   --artifact-root "$artifact_root" \

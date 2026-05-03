@@ -1,4 +1,4 @@
-"""Synthesize a port-04-test deb lock + override-deb-root for the safelibs
+"""Synthesize a port deb lock + override-deb-root for the safelibs
 validator using the .deb files this repo just built into dist/.
 
 Driven entirely by environment variables set by run-validation-tests.sh:
@@ -170,7 +170,7 @@ def main() -> int:
 
     lock = {
         "schema_version": 1,
-        "mode": "port-04-test",
+        "mode": "port",
         "libraries": [
             {
                 "library": library,
